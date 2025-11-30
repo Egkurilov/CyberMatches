@@ -1,0 +1,8 @@
+requests
+beautifulsoup4
+lxml
+psycopg[binary]
+python-dotenv
+aiogram
+aiohttp
+python-dotenv

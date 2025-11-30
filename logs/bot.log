@@ -1,0 +1,92 @@
+2025-11-26 16:11:04 [INFO] dota_matches_bot: Логирование инициализировано
+2025-11-26 16:11:04 [INFO] dota_matches_bot: Запуск бота...
+2025-11-26 16:11:10 [INFO] dota_matches_bot: Команда /start от пользователя 88376478 в чате 88376478
+2025-11-26 16:11:13 [INFO] dota_matches_bot: Команда /today от пользователя 88376478 в чате 88376478
+2025-11-26 16:11:13 [INFO] dota_matches_bot: Запрос матчей из API: http://45.10.245.84:8050/dota/matches/today
+2025-11-26 16:11:14 [INFO] dota_matches_bot: Ответ API: date=2025-11-26 timezone=Europe/Moscow, today_msk=2025-11-26, всего матчей=19
+2025-11-26 16:11:14 [INFO] dota_matches_bot: Успешно распарсили 19 матчей
+2025-11-26 16:11:15 [INFO] dota_matches_bot: Отправили первое сообщение /today в чате 88376478 (message_id=27)
+2025-11-26 16:11:15 [INFO] dota_matches_bot: Поллер ещё не запущен — стартуем новую фоновую задачу
+2025-11-26 16:11:15 [INFO] dota_matches_bot: Старт фонового поллера матчей (интервал 60 сек)
+2025-11-26 16:12:15 [INFO] dota_matches_bot: Запрос матчей из API: http://45.10.245.84:8050/dota/matches/today
+2025-11-26 16:12:15 [INFO] dota_matches_bot: Ответ API: date=2025-11-26 timezone=Europe/Moscow, today_msk=2025-11-26, всего матчей=19
+2025-11-26 16:12:15 [INFO] dota_matches_bot: Успешно распарсили 19 матчей
+2025-11-26 16:12:15 [INFO] dota_matches_bot: Изменений в матчах нет, сообщения не обновляем
+2025-11-26 16:13:15 [INFO] dota_matches_bot: Запрос матчей из API: http://45.10.245.84:8050/dota/matches/today
+2025-11-26 16:13:16 [INFO] dota_matches_bot: Ответ API: date=2025-11-26 timezone=Europe/Moscow, today_msk=2025-11-26, всего матчей=19
+2025-11-26 16:13:16 [INFO] dota_matches_bot: Успешно распарсили 19 матчей
+2025-11-26 16:13:16 [INFO] dota_matches_bot: Изменений в матчах нет, сообщения не обновляем
+2025-11-26 16:14:02 [INFO] dota_matches_bot: Фоновый поллер матчей остановлен (CancelledError)
+2025-11-26 16:14:02 [INFO] dota_matches_bot: Бот остановлен
+2025-11-26 16:14:04 [INFO] dota_matches_bot: Логирование инициализировано
+2025-11-26 16:14:04 [INFO] dota_matches_bot: Загружено подписчиков: 0
+2025-11-26 16:14:04 [INFO] dota_matches_bot: Запуск бота...
+2025-11-26 16:14:09 [INFO] dota_matches_bot: Команда /today от пользователя 88376478 в чате 88376478
+2025-11-26 16:14:09 [INFO] dota_matches_bot: Запрос матчей из API: http://45.10.245.84:8050/dota/matches/today
+2025-11-26 16:14:10 [INFO] dota_matches_bot: Ответ API: date=2025-11-26 timezone=Europe/Moscow, today_msk=2025-11-26, всего матчей=19
+2025-11-26 16:14:10 [INFO] dota_matches_bot: Успешно распарсили 19 матчей
+2025-11-26 16:14:11 [INFO] dota_matches_bot: Отправили первое сообщение /today в чате 88376478 (message_id=29)
+2025-11-26 16:14:11 [INFO] dota_matches_bot: Поллер матчей ещё не запущен — стартуем фоновую задачу
+2025-11-26 16:14:11 [INFO] dota_matches_bot: Старт фонового поллера матчей (интервал 60 сек)
+2025-11-26 16:15:11 [INFO] dota_matches_bot: Запрос матчей из API: http://45.10.245.84:8050/dota/matches/today
+2025-11-26 16:15:12 [INFO] dota_matches_bot: Ответ API: date=2025-11-26 timezone=Europe/Moscow, today_msk=2025-11-26, всего матчей=19
+2025-11-26 16:15:12 [INFO] dota_matches_bot: Успешно распарсили 19 матчей
+2025-11-26 16:15:12 [INFO] dota_matches_bot: Обнаружены изменения матчей, обновляем сообщения
+2025-11-26 16:15:12 [INFO] dota_matches_bot: Сообщение /today обновлено в чате 88376478 (message_id=29)
+2025-11-26 16:16:12 [INFO] dota_matches_bot: Запрос матчей из API: http://45.10.245.84:8050/dota/matches/today
+2025-11-26 16:16:13 [INFO] dota_matches_bot: Ответ API: date=2025-11-26 timezone=Europe/Moscow, today_msk=2025-11-26, всего матчей=19
+2025-11-26 16:16:13 [INFO] dota_matches_bot: Успешно распарсили 19 матчей
+2025-11-26 16:16:13 [INFO] dota_matches_bot: Изменений в матчах нет, сообщения не обновляем
+2025-11-26 16:17:13 [INFO] dota_matches_bot: Запрос матчей из API: http://45.10.245.84:8050/dota/matches/today
+2025-11-26 16:17:14 [INFO] dota_matches_bot: Ответ API: date=2025-11-26 timezone=Europe/Moscow, today_msk=2025-11-26, всего матчей=19
+2025-11-26 16:17:14 [INFO] dota_matches_bot: Успешно распарсили 19 матчей
+2025-11-26 16:17:14 [INFO] dota_matches_bot: Изменений в матчах нет, сообщения не обновляем
+2025-11-26 16:18:14 [INFO] dota_matches_bot: Запрос матчей из API: http://45.10.245.84:8050/dota/matches/today
+2025-11-26 16:18:15 [INFO] dota_matches_bot: Ответ API: date=2025-11-26 timezone=Europe/Moscow, today_msk=2025-11-26, всего матчей=19
+2025-11-26 16:18:15 [INFO] dota_matches_bot: Успешно распарсили 19 матчей
+2025-11-26 16:18:15 [INFO] dota_matches_bot: Изменений в матчах нет, сообщения не обновляем
+2025-11-26 16:19:15 [INFO] dota_matches_bot: Запрос матчей из API: http://45.10.245.84:8050/dota/matches/today
+2025-11-26 16:19:16 [INFO] dota_matches_bot: Ответ API: date=2025-11-26 timezone=Europe/Moscow, today_msk=2025-11-26, всего матчей=19
+2025-11-26 16:19:16 [INFO] dota_matches_bot: Успешно распарсили 19 матчей
+2025-11-26 16:19:16 [INFO] dota_matches_bot: Изменений в матчах нет, сообщения не обновляем
+2025-11-26 16:20:16 [INFO] dota_matches_bot: Запрос матчей из API: http://45.10.245.84:8050/dota/matches/today
+2025-11-26 16:20:17 [INFO] dota_matches_bot: Ответ API: date=2025-11-26 timezone=Europe/Moscow, today_msk=2025-11-26, всего матчей=19
+2025-11-26 16:20:17 [INFO] dota_matches_bot: Успешно распарсили 19 матчей
+2025-11-26 16:20:17 [INFO] dota_matches_bot: Изменений в матчах нет, сообщения не обновляем
+2025-11-26 16:21:17 [INFO] dota_matches_bot: Запрос матчей из API: http://45.10.245.84:8050/dota/matches/today
+2025-11-26 16:21:18 [INFO] dota_matches_bot: Ответ API: date=2025-11-26 timezone=Europe/Moscow, today_msk=2025-11-26, всего матчей=19
+2025-11-26 16:21:18 [INFO] dota_matches_bot: Успешно распарсили 19 матчей
+2025-11-26 16:21:18 [INFO] dota_matches_bot: Изменений в матчах нет, сообщения не обновляем
+2025-11-26 16:21:19 [INFO] dota_matches_bot: Останавливаем задачу poll_task
+2025-11-26 16:21:19 [INFO] dota_matches_bot: Фоновый поллер матчей остановлен (CancelledError)
+2025-11-26 16:21:19 [INFO] dota_matches_bot: Бот остановлен
+2025-11-26 16:21:25 [INFO] dota_matches_bot: Логирование инициализировано
+2025-11-26 16:21:25 [INFO] dota_matches_bot: Запуск бота...
+2025-11-26 16:21:25 [INFO] dota_matches_bot: Инициализация БД и таблицы подписчиков...
+2025-11-26 16:21:27 [INFO] dota_matches_bot: Таблица подписчиков проверена/создана.
+2025-11-26 16:21:27 [INFO] dota_matches_bot: Старт ежедневного нотификатора (10:00 МСК)
+2025-11-26 16:21:39 [INFO] dota_matches_bot: Команда /start от пользователя 88376478 в чате 88376478
+2025-11-26 16:21:41 [INFO] dota_matches_bot: Чат 88376478 добавлен в подписчики (или уже был).
+2025-11-26 16:21:44 [INFO] dota_matches_bot: Команда /today от пользователя 88376478 в чате 88376478
+2025-11-26 16:21:44 [INFO] dota_matches_bot: Запрос матчей из API: http://45.10.245.84:8050/dota/matches/today
+2025-11-26 16:21:45 [INFO] dota_matches_bot: Успешно распарсили 19 матчей
+2025-11-26 16:21:45 [INFO] dota_matches_bot: Отправили первое сообщение /today в чате 88376478 (message_id=33)
+2025-11-26 16:21:45 [INFO] dota_matches_bot: Поллер матчей ещё не запущен — стартуем фоновую задачу
+2025-11-26 16:21:45 [INFO] dota_matches_bot: Старт фонового поллера матчей (интервал 60 сек)
+2025-11-26 16:22:45 [INFO] dota_matches_bot: Запрос матчей из API: http://45.10.245.84:8050/dota/matches/today
+2025-11-26 16:22:46 [INFO] dota_matches_bot: Успешно распарсили 19 матчей
+2025-11-26 16:22:46 [INFO] dota_matches_bot: Изменений в матчах нет, сообщения не обновляем
+2025-11-26 16:23:46 [INFO] dota_matches_bot: Запрос матчей из API: http://45.10.245.84:8050/dota/matches/today
+2025-11-26 16:23:46 [INFO] dota_matches_bot: Успешно распарсили 19 матчей
+2025-11-26 16:23:46 [INFO] dota_matches_bot: Изменений в матчах нет, сообщения не обновляем
+2025-11-26 16:24:46 [INFO] dota_matches_bot: Запрос матчей из API: http://45.10.245.84:8050/dota/matches/today
+2025-11-26 16:24:49 [INFO] dota_matches_bot: Успешно распарсили 19 матчей
+2025-11-26 16:24:49 [INFO] dota_matches_bot: Изменений в матчах нет, сообщения не обновляем
+2025-11-26 16:25:49 [INFO] dota_matches_bot: Запрос матчей из API: http://45.10.245.84:8050/dota/matches/today
+2025-11-26 16:25:49 [INFO] dota_matches_bot: Успешно распарсили 19 матчей
+2025-11-26 16:25:49 [INFO] dota_matches_bot: Изменений в матчах нет, сообщения не обновляем
+2025-11-26 16:26:48 [INFO] dota_matches_bot: Останавливаем задачу poll_task
+2025-11-26 16:26:48 [INFO] dota_matches_bot: Фоновый поллер матчей остановлен (CancelledError)
+2025-11-26 16:26:48 [INFO] dota_matches_bot: Останавливаем задачу daily_task
+2025-11-26 16:26:48 [INFO] dota_matches_bot: Ежедневный нотификатор остановлен (CancelledError)
+2025-11-26 16:26:48 [INFO] dota_matches_bot: Бот остановлен

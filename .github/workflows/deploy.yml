@@ -97,12 +97,24 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         port: ${{ secrets.SERVER_PORT || '22' }}
         script: |
+          # Получаем timestamp из имени файла
+          TIMESTAMP_FILE=$(ls /tmp/cybermatches-deploy-*.tar.gz 2>/dev/null | head -1)
+          if [ -z "$TIMESTAMP_FILE" ]; then
+            echo "❌ Не найдено ни одного архива cybermatches-deploy-*.tar.gz"
+            exit 1
+          fi
+          
+          # Извлекаем timestamp из имени файла
+          DEPLOY_TIMESTAMP=$(basename "$TIMESTAMP_FILE" | sed 's/cybermatches-deploy-//' | sed 's/.tar.gz//')
+          echo "=== Используем timestamp: $DEPLOY_TIMESTAMP ==="
+          
           echo "=== ДЕБАГ: Начало деплоя ==="
-          echo "DEPLOY_TIMESTAMP: ${DEPLOY_TIMESTAMP}"
+          echo "TIMESTAMP_FILE: $TIMESTAMP_FILE"
+          echo "DEPLOY_TIMESTAMP: $DEPLOY_TIMESTAMP"
           
           # Проверяем существование архива
           echo "=== Проверка архива ==="
-          ls -la /tmp/cybermatches-deploy-${DEPLOY_TIMESTAMP}.tar.gz || echo "❌ Архив не найден!"
+          ls -la "/tmp/cybermatches-deploy-${DEPLOY_TIMESTAMP}.tar.gz" || echo "❌ Архив не найден!"
           
           # Показываем содержимое /tmp
           echo "=== Содержимое /tmp ==="
@@ -123,18 +135,12 @@ jobs:
           # Проверяем архив перед извлечением
           if [ -f "/tmp/cybermatches-deploy-${DEPLOY_TIMESTAMP}.tar.gz" ]; then
             echo "✅ Архив найден, извлекаем..."
-            sudo tar -xzf /tmp/cybermatches-deploy-${DEPLOY_TIMESTAMP}.tar.gz -C /root/cybermatches
+            sudo tar -xzf "/tmp/cybermatches-deploy-${DEPLOY_TIMESTAMP}.tar.gz" -C /root/cybermatches
             echo "=== Проверка после извлечения ==="
             ls -la /root/cybermatches/ || echo "❌ Папка пуста после извлечения!"
           else
-            echo "❌ Архив не найден! Проверяем старое имя..."
-            if [ -f "/tmp/cybermatches-deploy.tar.gz" ]; then
-              echo "✅ Найден старый архив, извлекаем..."
-              sudo tar -xzf /tmp/cybermatches-deploy.tar.gz -C /root/cybermatches
-            else
-              echo "❌ Ни один архив не найден! Деплой невозможен."
-              exit 1
-            fi
+            echo "❌ Архив не найден! Деплой невозможен."
+            exit 1
           fi
           
           sudo chown -R root:root /root/cybermatches

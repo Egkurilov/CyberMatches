@@ -68,6 +68,7 @@ jobs:
         source: "cybermatches-deploy.tar.gz"
         target: "/tmp/"
         strip_components: 0
+        overwrite: true
     
     - name: Prepare server for deployment
       uses: appleboy/ssh-action@v1.0.0

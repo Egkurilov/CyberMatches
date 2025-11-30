@@ -5,4 +5,5 @@ psycopg[binary]
 python-dotenv
 aiogram
 aiohttp
-python-dotenv
+fastapi
+uvicorn[standard]

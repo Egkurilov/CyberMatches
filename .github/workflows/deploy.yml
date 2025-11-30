@@ -168,9 +168,16 @@ jobs:
           source .venv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
-          pip install uvicorn || true
+          pip install fastapi uvicorn[standard] || true
           
           # Deactivate virtual environment
+          deactivate
+          
+          # Очистка БД от плейсхолдеров
+          echo "🧹 Очистка БД от плейсхолдеров команд..."
+          cd /root/cybermatches
+          source .venv/bin/activate
+          python3 cleanup_placeholders.py || echo "⚠️ Очистка завершилась с предупреждением"
           deactivate
           
           # Reload systemd and restart services

@@ -55,7 +55,11 @@ class DatabasePool:
         """Инициализация пула подключений"""
         if not self._pool:
             self._pool = await AsyncConnection.connect(
-                self.conn_str,
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
                 autocommit=True
             )
             logger.info("Пул подключений к БД инициализирован")

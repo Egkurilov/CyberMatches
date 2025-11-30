@@ -626,13 +626,58 @@ def parse_matches(html: str) -> list[Match]:
     tab_panels = soup.select("div.tab-content div.tab-pane")
     print(f"[DEBUG] найдено контейнеров вкладок: {len(tab_panels)}")
 
+    # Добавляем отладочную информацию о структуре страницы
+    print(f"[DEBUG] Вся HTML страница (первые 1000 символов):")
+    print(html[:1000])
+    print("-" * 50)
+    
+    # Проверяем, есть ли матчи на странице
+    all_text = soup.get_text(" ", strip=True)
+    print(f"[DEBUG] Весь текст страницы (первые 500 символов):")
+    print(all_text[:500])
+    print("-" * 50)
+    
+    # Ищем конкретные блоки с матчами
+    match_blocks = soup.find_all(['div', 'section'], class_=re.compile(r'match|game|fixture', re.I))
+    print(f"[DEBUG] Найдено блоков с матчами: {len(match_blocks)}")
+    
+    # Ищем ссылки на матчи
+    match_links = soup.find_all('a', href=re.compile(r'/dota2/Match:'))
+    print(f"[DEBUG] Найдено ссылок на матчи: {len(match_links)}")
+
+    # Проверяем, может быть структура страницы изменилась
+    # Ищем любые div с классами, содержащими "match"
+    all_divs = soup.find_all('div')
+    print(f"[DEBUG] Всего div элементов: {len(all_divs)}")
+    
+    # Ищем div с классами, содержащими "upcoming" или "completed"
+    upcoming_divs = soup.find_all('div', class_=re.compile(r'upcoming', re.I))
+    completed_divs = soup.find_all('div', class_=re.compile(r'completed', re.I))
+    print(f"[DEBUG] Div с upcoming: {len(upcoming_divs)}, completed: {len(completed_divs)}")
+
     for panel in tab_panels:
         tab_id = panel.get("id", "")
         panel_text = panel.get_text(" ", strip=True)
+        print(f"[DEBUG] Панель ID: {tab_id}, текст: {panel_text[:200]}...")
         if "Upcoming Matches" in panel_text or "Upcoming" in panel_text:
             upcoming_root = panel
+            print(f"[DEBUG] Найдена Upcoming панель")
         if "Completed Matches" in panel_text or "Completed" in panel_text:
             completed_root = panel
+            print(f"[DEBUG] Найдена Completed панель")
+
+    # Если не нашли стандартные панели, пробуем альтернативные селекторы
+    if not upcoming_root and not completed_root:
+        print("[DEBUG] Пробуем альтернативные селекторы...")
+        
+        # Ищем по классам
+        upcoming_root = soup.find('div', class_=re.compile(r'upcoming.*match', re.I))
+        completed_root = soup.find('div', class_=re.compile(r'completed.*match', re.I))
+        
+        if upcoming_root:
+            print(f"[DEBUG] Найдена Upcoming панель по классу: {upcoming_root.get('class')}")
+        if completed_root:
+            print(f"[DEBUG] Найдена Completed панель по классу: {completed_root.get('class')}")
 
     all_matches: list[Match] = []
 
@@ -640,11 +685,15 @@ def parse_matches(html: str) -> list[Match]:
         upcoming_matches = parse_matches_in_container(upcoming_root, assume_finished=False)
         print(f"[DEBUG] из Upcoming получили матчей: {len(upcoming_matches)}")
         all_matches.extend(upcoming_matches)
+    else:
+        print("[DEBUG] Upcoming панель не найдена")
 
     if completed_root is not None:
         completed_matches = parse_matches_in_container(completed_root, assume_finished=True)
         print(f"[DEBUG] из Completed получили матчей: {len(completed_matches)}")
         all_matches.extend(completed_matches)
+    else:
+        print("[DEBUG] Completed панель не найдена")
 
     print(f"[DEBUG] всего матчей (Upcoming + Completed): {len(all_matches)}")
     return all_matches

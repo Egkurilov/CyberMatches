@@ -107,7 +107,7 @@ jobs:
           # Extract new deployment
           sudo rm -rf /root/cybermatches
           sudo mkdir -p /root/cybermatches
-          sudo tar -xzf /tmp/cybermatches-deploy.tar.gz -C /root/cybermatches
+          sudo tar -xzf /tmp/cybermatches-deploy-${DEPLOY_TIMESTAMP}.tar.gz -C /root/cybermatches
           sudo chown -R root:root /root/cybermatches
           
           # Create logs directory if not exists

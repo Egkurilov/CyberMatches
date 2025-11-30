@@ -69,6 +69,22 @@ jobs:
         target: "/tmp/"
         strip_components: 0
     
+    - name: Prepare server for deployment
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        port: ${{ secrets.SERVER_PORT || '22' }}
+        script: |
+          # Clean up old deployment files
+          sudo rm -rf /tmp/cybermatches-deploy.tar.gz /tmp/cybermatches-deploy 2>/dev/null || true
+          
+          # Stop services before deployment
+          sudo systemctl stop cybermatches.service || true
+          sudo systemctl stop cybermatches-api.service || true
+          sudo systemctl stop cyber_telegram_bot.service || true
+    
     - name: Deploy and restart services
       uses: appleboy/ssh-action@v1.0.0
       with:
@@ -77,10 +93,6 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         port: ${{ secrets.SERVER_PORT || '22' }}
         script: |
-          # Stop services before deployment
-          sudo systemctl stop cybermatches.service || true
-          sudo systemctl stop cybermatches-api.service || true
-          sudo systemctl stop cyber_telegram_bot.service || true
           
           # Backup current deployment
           cd /root

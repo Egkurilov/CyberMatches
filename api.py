@@ -56,9 +56,7 @@ class DatabasePool:
         if not self._pool:
             self._pool = await AsyncConnection.connect(
                 self.conn_str,
-                autocommit=True,
-                min_size=2,
-                max_size=10
+                autocommit=True
             )
             logger.info("Пул подключений к БД инициализирован")
     
@@ -113,7 +111,7 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
                 status,
                 score,
                 liquipedia_match_id
-            FROM dota_matches
+            FROM dota_matches 
             WHERE (match_time_msk AT TIME ZONE 'Europe/Moscow')::date = %s
             ORDER BY match_time_msk;
             """,

@@ -464,6 +464,29 @@ def parse_matches_in_container(root: BeautifulSoup, assume_finished: bool) -> li
 def parse_body(time_part: str, body: str) -> Match | None:
     body = clean_body(body)
 
+    # Обработка плейсхолдеров команд (#5, #8, TBD и т.д.)
+    # Сначала проверяем, есть ли плейсхолдеры вместо реальных названий
+    placeholder_pattern = re.compile(r'^(#\d+|TBD)\s+(#\d+|TBD)\s+\((Bo\d+)\)\s*(.*)$')
+    placeholder_match = placeholder_pattern.match(body)
+    if placeholder_match:
+        team1 = placeholder_match.group(1)
+        team2 = placeholder_match.group(2)
+        bo = placeholder_match.group(3)
+        tail = placeholder_match.group(4).strip()
+        tournament = resolve_tournament_name(tail) if tail else None
+
+        time_msk = convert_time_to_msk_dt(time_part)
+        return Match(
+            time_raw=time_part,
+            time_msk=time_msk,
+            team1=team1,
+            team2=team2,
+            score=None,
+            bo=bo,
+            tournament=tournament,
+            status=None,
+        )
+
     # Универсальный кейс со счётом ДО team2:
     # "Travo 1 : 1 (Bo3) Stray BB Streamers Battle 12 - Playoffs"
     # "Komodo 0:2(Bo3). YG Lunar Snake 4 - November 26"

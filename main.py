@@ -441,9 +441,13 @@ def parse_matches_in_container(root: BeautifulSoup, assume_finished: bool) -> li
     # На всякий случай делаем множество, чтобы убрать дубли
     detail_links = list(dict.fromkeys(detail_links))
 
-    # 3) Мапа "краткий текст матча" -> detail_link (если получилось сопоставить)
-    # Это можно развить, но пока оставим как есть
-    # (сейчас match_url заполняется в update_scores_from_match_pages)
+    # 3) Сопоставляем матчи с URL-ами
+    # Создаем словарь для быстрого поиска URL по командам
+    url_by_teams = {}
+    for url in detail_links:
+        # Извлекаем ID матча из URL для сопоставления
+        match_id = url.split('/')[-1] if '/' in url else url
+        url_by_teams[match_id] = url
 
     matches: list[Match] = []
     for time_part, body in segments:
@@ -453,6 +457,29 @@ def parse_matches_in_container(root: BeautifulSoup, assume_finished: bool) -> li
 
         if assume_finished:
             m.status = "finished"
+
+        # Пытаемся найти URL для этого матча
+        if m.team1 and m.team2:
+            # Создаем возможные ключи для поиска
+            team_key = f"{m.team1} vs {m.team2}"
+            reverse_key = f"{m.team2} vs {m.team1}"
+            
+            # Ищем URL по ключевым словам из матча
+            for url in detail_links:
+                # Проверяем, содержит ли URL названия команд
+                url_lower = url.lower()
+                if (m.team1.lower() in url_lower and m.team2.lower() in url_lower) or \
+                   (m.team2.lower() in url_lower and m.team1.lower() in url_lower):
+                    m.match_url = url
+                    print(f"[DEBUG] Найден URL для матча {m.team1} vs {m.team2}: {url}")
+                    break
+            
+            # Если не нашли по командам, пробуем по времени и турниру
+            if not m.match_url and detail_links:
+                # Берем первый доступный URL для матчей без URL
+                m.match_url = detail_links[0] if detail_links else None
+                if m.match_url:
+                    print(f"[DEBUG] Назначен URL по умолчанию для матча {m.team1} vs {m.team2}: {m.match_url}")
 
         matches.append(m)
 
@@ -620,82 +647,108 @@ def parse_body(time_part: str, body: str) -> Match | None:
 def parse_matches(html: str) -> list[Match]:
     soup = BeautifulSoup(html, "lxml")
 
-    upcoming_root = None
-    completed_root = None
-
-    tab_panels = soup.select("div.tab-content div.tab-pane")
-    print(f"[DEBUG] найдено контейнеров вкладок: {len(tab_panels)}")
-
-    # Добавляем отладочную информацию о структуре страницы
-    print(f"[DEBUG] Вся HTML страница (первые 1000 символов):")
-    print(html[:1000])
-    print("-" * 50)
+    print(f"[DEBUG] Начинаем парсинг новой структуры страницы...")
     
-    # Проверяем, есть ли матчи на странице
-    all_text = soup.get_text(" ", strip=True)
-    print(f"[DEBUG] Весь текст страницы (первые 500 символов):")
-    print(all_text[:500])
-    print("-" * 50)
-    
-    # Ищем конкретные блоки с матчами
-    match_blocks = soup.find_all(['div', 'section'], class_=re.compile(r'match|game|fixture', re.I))
-    print(f"[DEBUG] Найдено блоков с матчами: {len(match_blocks)}")
-    
-    # Ищем ссылки на матчи
-    match_links = soup.find_all('a', href=re.compile(r'/dota2/Match:'))
-    print(f"[DEBUG] Найдено ссылок на матчи: {len(match_links)}")
-
-    # Проверяем, может быть структура страницы изменилась
-    # Ищем любые div с классами, содержащими "match"
-    all_divs = soup.find_all('div')
-    print(f"[DEBUG] Всего div элементов: {len(all_divs)}")
-    
-    # Ищем div с классами, содержащими "upcoming" или "completed"
-    upcoming_divs = soup.find_all('div', class_=re.compile(r'upcoming', re.I))
-    completed_divs = soup.find_all('div', class_=re.compile(r'completed', re.I))
-    print(f"[DEBUG] Div с upcoming: {len(upcoming_divs)}, completed: {len(completed_divs)}")
-
-    for panel in tab_panels:
-        tab_id = panel.get("id", "")
-        panel_text = panel.get_text(" ", strip=True)
-        print(f"[DEBUG] Панель ID: {tab_id}, текст: {panel_text[:200]}...")
-        if "Upcoming Matches" in panel_text or "Upcoming" in panel_text:
-            upcoming_root = panel
-            print(f"[DEBUG] Найдена Upcoming панель")
-        if "Completed Matches" in panel_text or "Completed" in panel_text:
-            completed_root = panel
-            print(f"[DEBUG] Найдена Completed панель")
-
-    # Если не нашли стандартные панели, пробуем альтернативные селекторы
-    if not upcoming_root and not completed_root:
-        print("[DEBUG] Пробуем альтернативные селекторы...")
-        
-        # Ищем по классам
-        upcoming_root = soup.find('div', class_=re.compile(r'upcoming.*match', re.I))
-        completed_root = soup.find('div', class_=re.compile(r'completed.*match', re.I))
-        
-        if upcoming_root:
-            print(f"[DEBUG] Найдена Upcoming панель по классу: {upcoming_root.get('class')}")
-        if completed_root:
-            print(f"[DEBUG] Найдена Completed панель по классу: {completed_root.get('class')}")
-
+    # Новая структура Liquipedia - матчи в div с классами new-match-style и match-info
     all_matches: list[Match] = []
+    
+    # Ищем контейнеры с матчами нового формата
+    match_containers = soup.find_all('div', class_=['new-match-style', 'match-info'])
+    
+    print(f"[DEBUG] Найдено контейнеров нового формата: {len(match_containers)}")
+    
+    if not match_containers:
+        # Пробуем альтернативные селекторы
+        match_containers = soup.find_all('div', class_=lambda x: x and 'match' in x.lower() and not any(word in str(x).lower() for word in ['menu', 'nav', 'header', 'footer', 'sidebar', 'rematch']))
+        print(f"[DEBUG] Найдено контейнеров с match в классе (фильтровано): {len(match_containers)}")
 
-    if upcoming_root is not None:
-        upcoming_matches = parse_matches_in_container(upcoming_root, assume_finished=False)
-        print(f"[DEBUG] из Upcoming получили матчей: {len(upcoming_matches)}")
-        all_matches.extend(upcoming_matches)
-    else:
-        print("[DEBUG] Upcoming панель не найдена")
+    for container in match_containers:
+        try:
+            # Ищем время матча
+            time_elem = container.find(['span', 'div'], class_=lambda x: x and 'timer-object' in str(x))
+            if not time_elem:
+                time_elem = container.find(['span', 'div'], class_=lambda x: x and any(word in str(x).lower() for word in ['time', 'date', 'countdown']))
+            
+            if not time_elem:
+                continue
+                
+            time_text = time_elem.get_text(strip=True)
+            
+            # Ищем команды
+            team_elems = container.find_all(['span', 'div'], class_=lambda x: x and 'team' in str(x).lower())
+            teams = []
+            for team_elem in team_elems:
+                team_text = team_elem.get_text(strip=True)
+                if team_text and team_text not in teams and len(team_text) > 1:
+                    teams.append(team_text)
+            
+            if len(teams) < 2:
+                continue
+                
+            team1, team2 = teams[0], teams[1]
+            
+            # Ищем формат Bo
+            bo_elem = container.find(['span', 'div'], text=lambda x: x and 'Bo' in x)
+            bo = None
+            if bo_elem:
+                bo = bo_elem.strip()
+            else:
+                # Ищем в тексте
+                bo_match = re.search(r'\\(Bo\\d+\\)', container.get_text())
+                if bo_match:
+                    bo = bo_match.group(0)
+            
+            # Ищем ссылку на матч
+            match_link = container.find('a', href=lambda x: x and '/dota2/Match:' in x)
+            match_url = None
+            if match_link:
+                match_url = urljoin('https://liquipedia.net', match_link.get('href'))
+            
+            # Ищем счет
+            score = None
+            score_elem = container.find(['span', 'div'], class_=lambda x: x and 'score' in str(x).lower())
+            if score_elem:
+                score_text = score_elem.get_text(strip=True)
+                if re.match(r'\\d+:\\d+', score_text):
+                    score = score_text
+            
+            # Ищем турнир
+            tournament = None
+            tournament_elem = container.find(['span', 'div'], class_=lambda x: x and any(word in str(x).lower() for word in ['tournament', 'league', 'event']))
+            if tournament_elem:
+                tournament = tournament_elem.get_text(strip=True)
+            else:
+                # Ищем в ссылках
+                tournament_link = container.find('a', href=lambda x: x and any(word in str(x).lower() for word in ['tournament', 'league']))
+                if tournament_link:
+                    tournament = tournament_link.get_text(strip=True)
+            
+            # Определяем статус по времени
+            status = "upcoming"  # По умолчанию
+            
+            # Создаем объект матча
+            time_msk = parse_time_to_msk(time_text)
+            
+            match = Match(
+                time_raw=time_text,
+                time_msk=time_msk,
+                team1=team1,
+                team2=team2,
+                score=score,
+                bo=bo,
+                tournament=tournament,
+                status=status,
+                match_url=match_url
+            )
+            
+            all_matches.append(match)
+            print(f"[DEBUG] Спарсен матч: {team1} vs {team2}, время: {time_text}, URL: {match_url}")
+            
+        except Exception as e:
+            print(f"[DEBUG] Ошибка при парсинге контейнера: {e}")
+            continue
 
-    if completed_root is not None:
-        completed_matches = parse_matches_in_container(completed_root, assume_finished=True)
-        print(f"[DEBUG] из Completed получили матчей: {len(completed_matches)}")
-        all_matches.extend(completed_matches)
-    else:
-        print("[DEBUG] Completed панель не найдена")
-
-    print(f"[DEBUG] всего матчей (Upcoming + Completed): {len(all_matches)}")
+    print(f"[DEBUG] Всего спарсено матчей: {len(all_matches)}")
     return all_matches
 
 
@@ -1053,50 +1106,79 @@ def fetch_score_from_match_page(match_url: str) -> tuple[str | None, str | None]
 def update_scores_from_match_pages() -> None:
     """
     Обновляем score и bo для матчей, у которых статус finished, но нет счёта.
+    Улучшенная версия с более детальной отладкой.
     """
+    print("=== Начало обновления счетов ===")
+    
     with get_db_connection() as conn:
         with conn.cursor() as cur:
+            # Получаем все матчи без счета (не только finished)
             cur.execute(
                 """
-                SELECT id, match_url, team1, team2, tournament
+                SELECT id, match_url, team1, team2, tournament, status, match_time_msk
                 FROM dota_matches
-                WHERE status = 'finished' AND score IS NULL;
+                WHERE score IS NULL OR score = ''
+                ORDER BY match_time_msk DESC
+                LIMIT 50;
                 """
             )
             rows = cur.fetchall()
+            
+            print(f"[DEBUG] Найдено матчей без счета: {len(rows)}")
+            
+            if not rows:
+                print("[DEBUG] Нет матчей без счета для обновления")
+                return
 
             updated = 0
             just_checked = 0
+            errors = 0
 
-            for match_id, match_url, team1, team2, tournament in rows:
+            for match_id, match_url, team1, team2, tournament, status, match_time in rows:
+                print(f"[DEBUG] Обрабатываем матч: {team1} vs {team2}, статус: {status}, URL: {match_url}")
+                
                 if not match_url:
+                    print(f"[DEBUG] Пропускаем матч {match_id}: нет URL")
                     just_checked += 1
                     continue
 
-                score, bo = fetch_score_from_match_page(match_url)
-                if not score:
+                try:
+                    score, bo = fetch_score_from_match_page(match_url)
+                    print(f"[DEBUG] Результат извлечения: score='{score}', bo='{bo}'")
+                    
+                    if score:
+                        print(f"[DEBUG] Обновляем счет для матча {match_id}: {score}")
+                        cur.execute(
+                            """
+                            UPDATE dota_matches
+                            SET score = %(score)s,
+                                bo = COALESCE(%(bo)s, bo),
+                                updated_at = now()
+                            WHERE id = %(id)s;
+                            """,
+                            {
+                                "id": match_id,
+                                "score": score,
+                                "bo": bo,
+                            },
+                        )
+                        updated += 1
+                        print(f"[DEBUG] ✅ Успешно обновлен счет для матча {match_id}")
+                    else:
+                        print(f"[DEBUG] ⚠️ Счет не найден для матча {match_id}")
+                        just_checked += 1
+                        
+                except Exception as e:
+                    print(f"[DEBUG] ❌ Ошибка при обработке матча {match_id}: {e}")
+                    errors += 1
                     just_checked += 1
-                    continue
-
-                cur.execute(
-                    """
-                    UPDATE dota_matches
-                    SET score = %(score)s,
-                        bo = COALESCE(%(bo)s, bo),
-                        updated_at = now()
-                    WHERE id = %(id)s;
-                    """,
-                    {
-                        "id": match_id,
-                        "score": score,
-                        "bo": bo,
-                    },
-                )
-                updated += 1
 
         conn.commit()
 
-    print(f"[score] Обновили счёт у {updated} матчей, просто проверили у {just_checked}")
+    print(f"[score] Результаты обновления:")
+    print(f"  ✅ Обновлено счетов: {updated}")
+    print(f"  ⚠️ Пропущено (нет счета): {just_checked}")
+    print(f"  ❌ Ошибок: {errors}")
 
 
 def worker_once() -> dict:

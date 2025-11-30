@@ -42,6 +42,9 @@ jobs:
     
     - name: Create deployment package
       run: |
+        # Create deployment archive with unique name to avoid conflicts
+        DEPLOY_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+        echo "DEPLOY_TIMESTAMP=$DEPLOY_TIMESTAMP" >> $GITHUB_ENV
         # Create deployment archive with explicit file list to avoid "file changed" error
         find . -type f \
           ! -path './.git/*' \
@@ -55,8 +58,8 @@ jobs:
           ! -name 'refactor_*.py' \
           ! -name 'deploy.sh' \
           ! -name 'DEPLOYMENT_SETUP.md' \
-          ! -name 'cybermatches-deploy.tar.gz' \
-          -print0 | tar -czf cybermatches-deploy.tar.gz --null -T -
+          ! -name "cybermatches-deploy-${DEPLOY_TIMESTAMP}.tar.gz" \
+          -print0 | tar -czf "cybermatches-deploy-${DEPLOY_TIMESTAMP}.tar.gz" --null -T -
     
     - name: Copy files to server
       uses: appleboy/scp-action@v0.1.5

@@ -134,7 +134,7 @@ jobs:
           echo "Updating systemd service files..."
           
           # Update parser service
-          sudo tee /etc/systemd/system/cybermatches.service > /dev/null <<'SERVICE_EOF'
+          cat > /tmp/cybermatches.service <<'SERVICE_EOF'
 [Unit]
 Description=CyberMatches Liquipedia Dota2 scraper
 After=network.target postgresql.service
@@ -153,9 +153,10 @@ StandardError=append:/root/cybermatches/logs/parser.log
 [Install]
 WantedBy=multi-user.target
 SERVICE_EOF
+          sudo mv /tmp/cybermatches.service /etc/systemd/system/cybermatches.service
 
           # Update API service
-          sudo tee /etc/systemd/system/cybermatches-api.service > /dev/null <<'SERVICE_EOF'
+          cat > /tmp/cybermatches-api.service <<'SERVICE_EOF'
 [Unit]
 Description=CyberMatches API Service
 After=network.target postgresql.service
@@ -174,9 +175,10 @@ StandardError=append:/root/cybermatches/logs/api.log
 [Install]
 WantedBy=multi-user.target
 SERVICE_EOF
+          sudo mv /tmp/cybermatches-api.service /etc/systemd/system/cybermatches-api.service
 
           # Update Telegram bot service
-          sudo tee /etc/systemd/system/cyber_telegram_bot.service > /dev/null <<'SERVICE_EOF'
+          cat > /tmp/cyber_telegram_bot.service <<'SERVICE_EOF'
 [Unit]
 Description=CyberMatches Telegram Bot
 After=network.target postgresql.service
@@ -195,6 +197,7 @@ StandardError=append:/root/cybermatches/logs/bot.log
 [Install]
 WantedBy=multi-user.target
 SERVICE_EOF
+          sudo mv /tmp/cyber_telegram_bot.service /etc/systemd/system/cyber_telegram_bot.service
           
           # Reload systemd and enable services
           echo "Reloading systemd..."

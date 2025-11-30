@@ -78,20 +78,17 @@ jobs:
         port: ${{ secrets.SERVER_PORT || '22' }}
         script: |
           # Stop services before deployment
-          echo "Stopping services..."
           sudo systemctl stop cybermatches.service || true
           sudo systemctl stop cybermatches-api.service || true
           sudo systemctl stop cyber_telegram_bot.service || true
           
           # Backup current deployment
-          echo "Creating backup..."
           cd /root
           if [ -d "cybermatches" ]; then
             sudo mv cybermatches cybermatches-backup-$(date +%Y%m%d-%H%M%S) || true
           fi
           
           # Extract new deployment
-          echo "Extracting new deployment..."
           sudo rm -rf /root/cybermatches
           sudo mkdir -p /root/cybermatches
           sudo tar -xzf /tmp/cybermatches-deploy.tar.gz -C /root/cybermatches
@@ -109,133 +106,35 @@ jobs:
           sudo chmod 600 /root/cybermatches/.env || true
           
           # Check and setup Python environment
-          echo "Checking Python environment..."
           cd /root/cybermatches
           
           # Check if virtual environment exists, if not create it
           if [ ! -d ".venv" ]; then
-            echo "Creating virtual environment..."
             python3 -m venv .venv
           fi
           
           # Activate virtual environment and install dependencies
-          echo "Installing dependencies..."
           source .venv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
-          
-          # Install uvicorn for API if not present
           pip install uvicorn || true
           
           # Deactivate virtual environment
           deactivate
           
-          # Update systemd service files to use correct paths
-          echo "Updating systemd service files..."
-          
-          # Create parser service file
-          sudo tee /etc/systemd/system/cybermatches.service > /dev/null <<'EOF'
-[Unit]
-Description=CyberMatches Liquipedia Dota2 scraper
-After=network.target postgresql.service
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/root/cybermatches
-Environment=PYTHONPATH=/root/cybermatches
-ExecStart=/root/cybermatches/.venv/bin/python /root/cybermatches/main.py
-Restart=always
-RestartSec=10
-StandardOutput=append:/root/cybermatches/logs/parser.log
-StandardError=append:/root/cybermatches/logs/parser.log
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-          # Create API service file
-          sudo tee /etc/systemd/system/cybermatches-api.service > /dev/null <<'EOF'
-[Unit]
-Description=CyberMatches API Service
-After=network.target postgresql.service
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/root/cybermatches
-Environment=PYTHONPATH=/root/cybermatches
-ExecStart=/root/cybermatches/.venv/bin/python -m uvicorn api:app --host 0.0.0.0 --port 8050
-Restart=always
-RestartSec=10
-StandardOutput=append:/root/cybermatches/logs/api.log
-StandardError=append:/root/cybermatches/logs/api.log
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-          # Create Telegram bot service file
-          sudo tee /etc/systemd/system/cyber_telegram_bot.service > /dev/null <<'EOF'
-[Unit]
-Description=CyberMatches Telegram Bot
-After=network.target postgresql.service
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/root/cybermatches
-Environment=PYTHONPATH=/root/cybermatches
-ExecStart=/root/cybermatches/.venv/bin/python /root/cybermatches/cyber_telegram_bot_refactored.py
-Restart=always
-RestartSec=5
-StandardOutput=append:/root/cybermatches/logs/bot.log
-StandardError=append:/root/cybermatches/logs/bot.log
-
-[Install]
-WantedBy=multi-user.target
-EOF
-          
-          # Reload systemd and enable services
-          echo "Reloading systemd..."
+          # Reload systemd and restart services
           sudo systemctl daemon-reload
+          sudo systemctl enable cybermatches.service cybermatches-api.service cyber_telegram_bot.service
+          sudo systemctl restart cybermatches.service cybermatches-api.service cyber_telegram_bot.service
           
-          # Enable services for auto-start
-          sudo systemctl enable cybermatches.service
-          sudo systemctl enable cybermatches-api.service
-          sudo systemctl enable cyber_telegram_bot.service
-          
-          # Restart services
-          echo "Restarting services..."
-          sudo systemctl restart cybermatches.service
-          sudo systemctl restart cybermatches-api.service
-          sudo systemctl restart cyber_telegram_bot.service
-          
-          # Wait a moment for services to start
+          # Wait and check status
           sleep 5
-          
-          # Check service status
-          echo "Checking service status..."
-          echo "Parser service status:"
-          sudo systemctl is-active cybermatches.service || echo "Parser service failed to start"
-          echo "API service status:"
-          sudo systemctl is-active cybermatches-api.service || echo "API service failed to start"
-          echo "Bot service status:"
-          sudo systemctl is-active cyber_telegram_bot.service || echo "Bot service failed to start"
-          
-          # Check logs for any immediate errors
-          echo "Checking recent logs..."
-          echo "=== Parser logs ==="
-          sudo tail -n 10 /root/cybermatches/logs/parser.log 2>/dev/null || echo "No parser logs yet"
-          echo "=== API logs ==="
-          sudo tail -n 10 /root/cybermatches/logs/api.log 2>/dev/null || echo "No API logs yet"
-          echo "=== Bot logs ==="
-          sudo tail -n 10 /root/cybermatches/logs/bot.log 2>/dev/null || echo "No bot logs yet"
+          sudo systemctl is-active cybermatches.service || echo "Parser failed"
+          sudo systemctl is-active cybermatches-api.service || echo "API failed"
+          sudo systemctl is-active cyber_telegram_bot.service || echo "Bot failed"
           
           # Clean up
           sudo rm -f /tmp/cybermatches-deploy.tar.gz
-          
-          echo "Deployment completed successfully!"
     
     - name: Cleanup old backups
       uses: appleboy/ssh-action@v1.0.0

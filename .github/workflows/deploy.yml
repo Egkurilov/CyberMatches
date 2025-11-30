@@ -178,6 +178,20 @@ jobs:
           sudo systemctl enable cybermatches.service cybermatches-api.service cyber_telegram_bot.service
           sudo systemctl restart cybermatches.service cybermatches-api.service cyber_telegram_bot.service
           
+          # Финальная проверка и сохранение состояния
+          echo "=== ФИНАЛЬНАЯ ПРОВЕРКА ==="
+          echo "Содержимое /root/cybermatches:"
+          ls -la /root/cybermatches/ || echo "❌ Папка /root/cybermatches пуста!"
+          
+          echo "Содержимое текущей директории:"
+          pwd && ls -la || echo "❌ Текущая директория пуста!"
+          
+          # Сохраняем информацию о деплое
+          echo "Деплой завершен: $(date)" > /root/cybermatches/DEPLOY_INFO.txt
+          echo "Timestamp: $DEPLOY_TIMESTAMP" >> /root/cybermatches/DEPLOY_INFO.txt
+          echo "Файлы после деплоя:" >> /root/cybermatches/DEPLOY_INFO.txt
+          ls -la /root/cybermatches/ >> /root/cybermatches/DEPLOY_INFO.txt
+          
           # Wait and check status with detailed logging
           sleep 5
           echo "=== Service Status Check ==="

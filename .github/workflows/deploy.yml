@@ -22,6 +22,23 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install uvicorn
+    
+    - name: Test Python syntax
+      run: |
+        echo "Testing Python syntax..."
+        python -m py_compile main.py
+        python -m py_compile api.py
+        python -m py_compile cyber_telegram_bot_refactored.py
+        echo "Python syntax check passed"
+    
+    - name: Test imports
+      run: |
+        echo "Testing imports..."
+        python -c "import main; print('main.py imports OK')"
+        python -c "import api; print('api.py imports OK')" 
+        python -c "import cyber_telegram_bot_refactored; print('cyber_telegram_bot_refactored.py imports OK')"
+        echo "Import tests passed"
     
     - name: Create deployment package
       run: |
@@ -91,17 +108,129 @@ jobs:
           # Set proper permissions
           sudo chmod 600 /root/cybermatches/.env || true
           
+          # Check and setup Python environment
+          echo "Checking Python environment..."
+          cd /root/cybermatches
+          
+          # Check if virtual environment exists, if not create it
+          if [ ! -d ".venv" ]; then
+            echo "Creating virtual environment..."
+            python3 -m venv .venv
+          fi
+          
+          # Activate virtual environment and install dependencies
+          echo "Installing dependencies..."
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          
+          # Install uvicorn for API if not present
+          pip install uvicorn || true
+          
+          # Deactivate virtual environment
+          deactivate
+          
+          # Update systemd service files to use correct paths
+          echo "Updating systemd service files..."
+          
+          # Update parser service
+          sudo tee /etc/systemd/system/cybermatches.service > /dev/null <<'SERVICE_EOF'
+[Unit]
+Description=CyberMatches Liquipedia Dota2 scraper
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/cybermatches
+Environment=PYTHONPATH=/root/cybermatches
+ExecStart=/root/cybermatches/.venv/bin/python /root/cybermatches/main.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/root/cybermatches/logs/parser.log
+StandardError=append:/root/cybermatches/logs/parser.log
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_EOF
+
+          # Update API service
+          sudo tee /etc/systemd/system/cybermatches-api.service > /dev/null <<'SERVICE_EOF'
+[Unit]
+Description=CyberMatches API Service
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/cybermatches
+Environment=PYTHONPATH=/root/cybermatches
+ExecStart=/root/cybermatches/.venv/bin/python -m uvicorn api:app --host 0.0.0.0 --port 8050
+Restart=always
+RestartSec=10
+StandardOutput=append:/root/cybermatches/logs/api.log
+StandardError=append:/root/cybermatches/logs/api.log
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_EOF
+
+          # Update Telegram bot service
+          sudo tee /etc/systemd/system/cyber_telegram_bot.service > /dev/null <<'SERVICE_EOF'
+[Unit]
+Description=CyberMatches Telegram Bot
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/cybermatches
+Environment=PYTHONPATH=/root/cybermatches
+ExecStart=/root/cybermatches/.venv/bin/python /root/cybermatches/cyber_telegram_bot_refactored.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/root/cybermatches/logs/bot.log
+StandardError=append:/root/cybermatches/logs/bot.log
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_EOF
+          
+          # Reload systemd and enable services
+          echo "Reloading systemd..."
+          sudo systemctl daemon-reload
+          
+          # Enable services for auto-start
+          sudo systemctl enable cybermatches.service
+          sudo systemctl enable cybermatches-api.service
+          sudo systemctl enable cyber_telegram_bot.service
+          
           # Restart services
           echo "Restarting services..."
           sudo systemctl restart cybermatches.service
           sudo systemctl restart cybermatches-api.service
           sudo systemctl restart cyber_telegram_bot.service
           
+          # Wait a moment for services to start
+          sleep 5
+          
           # Check service status
           echo "Checking service status..."
-          sudo systemctl is-active cybermatches.service
-          sudo systemctl is-active cybermatches-api.service
-          sudo systemctl is-active cyber_telegram_bot.service
+          echo "Parser service status:"
+          sudo systemctl is-active cybermatches.service || echo "Parser service failed to start"
+          echo "API service status:"
+          sudo systemctl is-active cybermatches-api.service || echo "API service failed to start"
+          echo "Bot service status:"
+          sudo systemctl is-active cyber_telegram_bot.service || echo "Bot service failed to start"
+          
+          # Check logs for any immediate errors
+          echo "Checking recent logs..."
+          echo "=== Parser logs ==="
+          sudo tail -n 10 /root/cybermatches/logs/parser.log 2>/dev/null || echo "No parser logs yet"
+          echo "=== API logs ==="
+          sudo tail -n 10 /root/cybermatches/logs/api.log 2>/dev/null || echo "No API logs yet"
+          echo "=== Bot logs ==="
+          sudo tail -n 10 /root/cybermatches/logs/bot.log 2>/dev/null || echo "No bot logs yet"
           
           # Clean up
           sudo rm -f /tmp/cybermatches-deploy.tar.gz

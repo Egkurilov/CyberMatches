@@ -25,18 +25,21 @@ jobs:
     
     - name: Create deployment package
       run: |
-        # Create deployment archive
-        tar -czf cybermatches-deploy.tar.gz \
-          --exclude='.git' \
-          --exclude='__pycache__' \
-          --exclude='*.pyc' \
-          --exclude='.env' \
-          --exclude='logs/*.log' \
-          --exclude='.github' \
-          --exclude='test_*.py' \
-          --exclude='migrate_*.py' \
-          --exclude='refactor_*.py' \
-          .
+        # Create deployment archive with explicit file list to avoid "file changed" error
+        find . -type f \
+          ! -path './.git/*' \
+          ! -path './__pycache__/*' \
+          ! -name '*.pyc' \
+          ! -name '.env' \
+          ! -path './logs/*.log' \
+          ! -path './.github/*' \
+          ! -name 'test_*.py' \
+          ! -name 'migrate_*.py' \
+          ! -name 'refactor_*.py' \
+          ! -name 'deploy.sh' \
+          ! -name 'DEPLOYMENT_SETUP.md' \
+          ! -name 'cybermatches-deploy.tar.gz' \
+          -print0 | tar -czf cybermatches-deploy.tar.gz --null -T -
     
     - name: Copy files to server
       uses: appleboy/scp-action@v0.1.5

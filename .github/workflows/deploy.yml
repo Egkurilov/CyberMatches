@@ -180,17 +180,36 @@ jobs:
           
           # Финальная проверка и сохранение состояния
           echo "=== ФИНАЛЬНАЯ ПРОВЕРКА ==="
-          echo "Содержимое /root/cybermatches:"
-          ls -la /root/cybermatches/ || echo "❌ Папка /root/cybermatches пуста!"
           
+          # Проверяем абсолютный путь
+          echo "Проверяем абсолютный путь /root/cybermatches:"
+          ls -la /root/cybermatches/ 2>/dev/null || echo "❌ /root/cybermatches не существует"
+          
+          # Проверяем текущую директорию
+          echo "Текущая директория: $(pwd)"
           echo "Содержимое текущей директории:"
-          pwd && ls -la || echo "❌ Текущая директория пуста!"
+          ls -la 2>/dev/null || echo "❌ Текущая директория пуста"
           
-          # Сохраняем информацию о деплое
+          # Проверяем, где мы находимся
+          echo "Полный путь текущей директории: $(pwd)"
+          echo "Проверяем родительскую директорию:"
+          ls -la ../ 2>/dev/null || echo "❌ Родительская директория пуста"
+          
+          # Проверяем все возможные места
+          echo "Проверяем /home/:"
+          ls -la /home/ 2>/dev/null || echo "❌ /home/ пуста"
+          
+          echo "Проверяем /tmp/:"
+          ls -la /tmp/ 2>/dev/null | grep -E "(cybermatches|main\.py)" || echo "❌ В /tmp/ нет cybermatches файлов"
+          
+          # Создаем файл с информацией о деплое в любом случае
+          mkdir -p /root/cybermatches
           echo "Деплой завершен: $(date)" > /root/cybermatches/DEPLOY_INFO.txt
           echo "Timestamp: $DEPLOY_TIMESTAMP" >> /root/cybermatches/DEPLOY_INFO.txt
-          echo "Файлы после деплоя:" >> /root/cybermatches/DEPLOY_INFO.txt
-          ls -la /root/cybermatches/ >> /root/cybermatches/DEPLOY_INFO.txt
+          echo "Путь извлечения: /root/cybermatches" >> /root/cybermatches/DEPLOY_INFO.txt
+          echo "Текущая директория: $(pwd)" >> /root/cybermatches/DEPLOY_INFO.txt
+          echo "Проверка после извлечения:" >> /root/cybermatches/DEPLOY_INFO.txt
+          ls -la /root/cybermatches/ 2>/dev/null >> /root/cybermatches/DEPLOY_INFO.txt || echo "Папка пуста" >> /root/cybermatches/DEPLOY_INFO.txt
           
           # Wait and check status with detailed logging
           sleep 5

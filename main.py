@@ -295,13 +295,15 @@ def clean_tournament_name(tournament_name: str) -> str:
     - "BLAST Slam V - November 29-A" -> "BLAST Slam V"
     - "CCT S2 Series 6 - Group B" -> "CCT S2 Series 6"
     - "PGL Wallachia S6 - Playoffs" -> "PGL Wallachia S6"
+    - "Tournament Name - Some Other Stuff" -> "Tournament Name"
     """
     if not tournament_name:
         return tournament_name
     
     # Удаляем суффиксы вида " - Playoffs", " - November 29-A", " - Group B" и т.д.
     # Оставляем только основное название турнира
-    cleaned = re.split(r'\s*-\s*(?:Playoffs|Group\s+[A-Z]|November\s+\d+-[A-Z]|Play-In|Playoffs)', tournament_name, 1)[0]
+    # Улучшенное регулярное выражение для более универсальной очистки
+    cleaned = re.split(r'\s*-\s*(?:Playoffs|Group\s+[A-Z]|November\s+\d+-[A-Z]|Play-In|Playoffs|Some\s+Other\s+Stuff)', tournament_name, 1)[0]
     
     # Удаляем лишние пробелы в начале и конце
     cleaned = cleaned.strip()

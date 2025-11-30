@@ -1,0 +1,118 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Create deployment package
+      run: |
+        # Create deployment archive
+        tar -czf cybermatches-deploy.tar.gz \
+          --exclude='.git' \
+          --exclude='__pycache__' \
+          --exclude='*.pyc' \
+          --exclude='.env' \
+          --exclude='logs/*.log' \
+          --exclude='.github' \
+          --exclude='test_*.py' \
+          --exclude='migrate_*.py' \
+          --exclude='refactor_*.py' \
+          .
+    
+    - name: Copy files to server
+      uses: appleboy/scp-action@v0.1.5
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        port: ${{ secrets.SERVER_PORT || '22' }}
+        source: "cybermatches-deploy.tar.gz"
+        target: "/tmp/cybermatches-deploy.tar.gz"
+        strip_components: 0
+    
+    - name: Deploy and restart services
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        port: ${{ secrets.SERVER_PORT || '22' }}
+        script: |
+          # Stop services before deployment
+          echo "Stopping services..."
+          sudo systemctl stop cybermatches.service || true
+          sudo systemctl stop cybermatches-api.service || true
+          sudo systemctl stop cyber_telegram_bot.service || true
+          
+          # Backup current deployment
+          echo "Creating backup..."
+          cd /root
+          if [ -d "cybermatches" ]; then
+            sudo mv cybermatches cybermatches-backup-$(date +%Y%m%d-%H%M%S) || true
+          fi
+          
+          # Extract new deployment
+          echo "Extracting new deployment..."
+          sudo rm -rf /root/cybermatches
+          sudo mkdir -p /root/cybermatches
+          sudo tar -xzf /tmp/cybermatches-deploy.tar.gz -C /root/cybermatches
+          sudo chown -R root:root /root/cybermatches
+          
+          # Create logs directory if not exists
+          sudo mkdir -p /root/cybermatches/logs
+          
+          # Copy environment file if exists in backup
+          if [ -f "/root/cybermatches-backup-*/.env" ]; then
+            sudo cp /root/cybermatches-backup-*/.env /root/cybermatches/.env
+          fi
+          
+          # Set proper permissions
+          sudo chmod 600 /root/cybermatches/.env || true
+          
+          # Restart services
+          echo "Restarting services..."
+          sudo systemctl restart cybermatches.service
+          sudo systemctl restart cybermatches-api.service
+          sudo systemctl restart cyber_telegram_bot.service
+          
+          # Check service status
+          echo "Checking service status..."
+          sudo systemctl is-active cybermatches.service
+          sudo systemctl is-active cybermatches-api.service
+          sudo systemctl is-active cyber_telegram_bot.service
+          
+          # Clean up
+          sudo rm -f /tmp/cybermatches-deploy.tar.gz
+          
+          echo "Deployment completed successfully!"
+    
+    - name: Cleanup old backups
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        port: ${{ secrets.SERVER_PORT || '22' }}
+        script: |
+          # Keep only last 5 backups
+          cd /root
+          ls -dt cybermatches-backup-* | tail -n +6 | xargs sudo rm -rf || true

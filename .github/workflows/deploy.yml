@@ -66,7 +66,7 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         port: ${{ secrets.SERVER_PORT || '22' }}
         source: "cybermatches-deploy.tar.gz"
-        target: "/tmp/cybermatches-deploy.tar.gz"
+        target: "/tmp/"
         strip_components: 0
     
     - name: Deploy and restart services
@@ -127,14 +127,23 @@ jobs:
           sudo systemctl enable cybermatches.service cybermatches-api.service cyber_telegram_bot.service
           sudo systemctl restart cybermatches.service cybermatches-api.service cyber_telegram_bot.service
           
-          # Wait and check status
+          # Wait and check status with detailed logging
           sleep 5
-          sudo systemctl is-active cybermatches.service || echo "Parser failed"
-          sudo systemctl is-active cybermatches-api.service || echo "API failed"
-          sudo systemctl is-active cyber_telegram_bot.service || echo "Bot failed"
+          echo "=== Service Status Check ==="
+          sudo systemctl is-active cybermatches.service && echo "✅ Parser: ACTIVE" || echo "❌ Parser: FAILED"
+          sudo systemctl is-active cybermatches-api.service && echo "✅ API: ACTIVE" || echo "❌ API: FAILED"
+          sudo systemctl is-active cyber_telegram_bot.service && echo "✅ Bot: ACTIVE" || echo "❌ Bot: FAILED"
           
-          # Clean up
-          sudo rm -f /tmp/cybermatches-deploy.tar.gz
+          echo "=== Recent Logs ==="
+          echo "--- Parser ---"
+          sudo tail -n 5 /root/cybermatches/logs/parser.log 2>/dev/null || echo "No parser logs"
+          echo "--- API ---"
+          sudo tail -n 5 /root/cybermatches/logs/api.log 2>/dev/null || echo "No API logs"
+          echo "--- Bot ---"
+          sudo tail -n 5 /root/cybermatches/logs/bot.log 2>/dev/null || echo "No bot logs"
+          
+          # Clean up with error handling
+          sudo rm -rf /tmp/cybermatches-deploy.tar.gz /tmp/cybermatches-deploy 2>/dev/null || true
     
     - name: Cleanup old backups
       uses: appleboy/ssh-action@v1.0.0

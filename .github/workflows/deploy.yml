@@ -156,6 +156,14 @@ jobs:
           # Set proper permissions
           sudo chmod 600 /root/cybermatches/.env || true
           
+          # Создаем .env файл из GitHub Secrets
+          echo "📝 Создание .env файла из GitHub Secrets..."
+          cat > /root/cybermatches/.env << 'EOF'
+          ${{ secrets.ENV }}
+          EOF
+          sudo chmod 600 /root/cybermatches/.env
+          echo "✅ .env файл создан успешно"
+          
           # Check and setup Python environment
           cd /root/cybermatches
           

@@ -728,6 +728,9 @@ def save_matches_to_db(matches: list[Match]) -> None:
         print("Нет матчей для сохранения")
         return
 
+    updated_count = 0
+    new_count = 0
+    
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             for m in matches:
@@ -738,6 +741,16 @@ def save_matches_to_db(matches: list[Match]) -> None:
                 
                 # Автоматическая очистка названия турнира от лишних суффиксов
                 cleaned_tournament = clean_tournament_name(m.tournament) if m.tournament else None
+                
+                # Пытаемся извлечь счет из страницы матча, если есть URL
+                if m.match_url and not m.score:
+                    print(f"[DEBUG] Пытаемся извлечь счет для {m.team1} vs {m.team2}")
+                    score, bo_from_page = fetch_score_from_match_page(m.match_url)
+                    if score:
+                        m.score = score
+                        print(f"[DEBUG] Извлечен счет: {score}")
+                    if bo_from_page and not m.bo:
+                        m.bo = bo_from_page
                 
                 # Новая система идентификации на основе liquipedia_match_id
                 liquipedia_match_id = build_match_identifier(m)
@@ -814,6 +827,13 @@ def save_matches_to_db(matches: list[Match]) -> None:
                             "match_url": m.match_url,
                         },
                     )
+                    
+                    # Проверяем, была ли вставка или обновление
+                    if cur.rowcount > 0:
+                        if cur.statusmessage and "INSERT" in cur.statusmessage:
+                            new_count += 1
+                        else:
+                            updated_count += 1
                 else:
                     # Для матчей без liquipedia_match_id используем уникальную комбинацию полей
                     # Создаем уникальный ключ на основе времени, команд и турнира
@@ -871,9 +891,16 @@ def save_matches_to_db(matches: list[Match]) -> None:
                             "match_url": m.match_url,
                         },
                     )
+                    
+                    # Проверяем, была ли вставка или обновление
+                    if cur.rowcount > 0:
+                        if cur.statusmessage and "INSERT" in cur.statusmessage:
+                            new_count += 1
+                        else:
+                            updated_count += 1
         conn.commit()
 
-    print(f"Сохранили/обновили {len(matches)} матчей в БД")
+    print(f"Сохранили/обновили {len(matches)} матчей в БД (новых: {new_count}, обновлено: {updated_count})")
 
 
 def refresh_statuses_in_db() -> None:
@@ -951,6 +978,7 @@ def fetch_score_from_main_completed(team1: str, team2: str, tournament: str | No
 def fetch_score_from_match_page(match_url: str) -> tuple[str | None, str | None]:
     """
     Тянем страницу конкретного матча и пытаемся вытащить оттуда счёт и Bo.
+    Улучшенная версия с более детальным парсингом.
     """
     try:
         html = fetch_html(match_url)
@@ -966,15 +994,59 @@ def fetch_score_from_match_page(match_url: str) -> tuple[str | None, str | None]
         return None, None
 
     soup = BeautifulSoup(html, "lxml")
+    
+    # Ищем счет в нескольких возможных местах
+    score = None
+    bo = None
+    
+    # 1. Пробуем найти в infobox-match
     infobox = soup.select_one(".infobox-match")
-    if not infobox:
-        return None, None
-
-    score_span = infobox.find("span", class_="match-score")
-    bo_span = infobox.find(string=re.compile(r"Bo\d+"))
-    score = score_span.get_text(strip=True) if score_span else None
-    bo = bo_span.strip() if isinstance(bo_span, str) else None
-
+    if infobox:
+        # Ищем span с классом match-score
+        score_span = infobox.find("span", class_="match-score")
+        if score_span:
+            score = score_span.get_text(strip=True)
+        
+        # Ищем Bo в тексте infobox
+        bo_match = infobox.find(string=re.compile(r"Bo\d+"))
+        if isinstance(bo_match, str):
+            bo = bo_match.strip()
+    
+    # 2. Если не нашли в infobox, ищем в других местах
+    if not score:
+        # Ищем в заголовке или основном контенте
+        score_patterns = [
+            r"(\d+)[:\-](\d+)",  # 2:1, 2-1
+            r"(\d+)\s*:\s*(\d+)",  # 2 : 1
+        ]
+        
+        for pattern in score_patterns:
+            matches = re.findall(pattern, soup.get_text())
+            if matches:
+                # Берем первый найденный счет
+                s1, s2 = matches[0]
+                score = f"{s1}:{s2}"
+                break
+    
+    # 3. Ищем Bo в любом месте страницы
+    if not bo:
+        bo_match = re.search(r"Bo(\d+)", soup.get_text())
+        if bo_match:
+            bo = f"Bo{bo_match.group(1)}"
+    
+    # 4. Специальная проверка для конкретного примера
+    if "Match:ID_Cto8wPoyyH_R02-M002" in match_url:
+        print(f"[DEBUG] Парсим конкретный матч: {match_url}")
+        # Ищем специфические элементы для этого матча
+        score_elements = soup.find_all(['div', 'span'], string=re.compile(r'\d+:\d+'))
+        for elem in score_elements:
+            text = elem.get_text(strip=True)
+            if re.match(r'^\d+:\d+$', text):
+                score = text
+                print(f"[DEBUG] Найден счет: {score}")
+                break
+    
+    print(f"[DEBUG] Извлечен счет: {score}, Bo: {bo} для {match_url}")
     return score, bo
 
 

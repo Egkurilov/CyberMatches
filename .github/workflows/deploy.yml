@@ -92,22 +92,19 @@ jobs:
           echo "${{ secrets.ENV }}" | sudo tee /root/cybermatches/.env > /dev/null
           sudo chmod 600 /root/cybermatches/.env
           
-          # Настроить Python окружение
+          # Установить системные зависимости
           cd /root/cybermatches
-          python3 -m venv .venv
-          source .venv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install fastapi uvicorn
-          deactivate
+          pip3 install -r requirements.txt
+          pip3 install fastapi uvicorn aiohttp aiogram python-dotenv psycopg[binary] requests beautifulsoup4 lxml
+          
+          # Создать директорию для логов
+          sudo mkdir -p /root/cybermatches/logs
           
           # Обновить systemd сервисы
           sudo bash setup_services.sh
           
           # Очистить плейсхолдеры
-          source .venv/bin/activate
           python3 cleanup_placeholders.py || true
-          deactivate
           
           # Перезапустить сервисы
           sudo systemctl daemon-reload

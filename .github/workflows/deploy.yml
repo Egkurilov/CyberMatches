@@ -3,8 +3,6 @@ name: Deploy to Server
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
 
 jobs:
   deploy:
@@ -18,48 +16,41 @@ jobs:
       with:
         python-version: '3.9'
     
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install uvicorn fastapi psycopg[binary] python-dotenv aiohttp aiogram
-    
     - name: Test Python syntax
       run: |
         echo "Testing Python syntax..."
         python -m py_compile main.py
         python -m py_compile api.py
-        python -m py_compile cyber_telegram_bot_refactored.py
-        echo "Python syntax check passed"
-    
-    - name: Test imports
-      run: |
-        echo "Testing imports..."
-        python -c "import main; print('main.py imports OK')"
-        python -c "import api; print('api.py imports OK')" 
-        python -c "import cyber_telegram_bot_refactored; print('cyber_telegram_bot_refactored.py imports OK')"
-        echo "Import tests passed"
+        python -m py_compile improved_parser.py
+        echo "✅ Python syntax check passed"
     
     - name: Create deployment package
       run: |
-        # Create deployment archive with unique name to avoid conflicts
-        DEPLOY_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-        echo "DEPLOY_TIMESTAMP=$DEPLOY_TIMESTAMP" >> $GITHUB_ENV
-        # Create deployment archive with explicit file list to avoid "file changed" error
-        find . -type f \
-          ! -path './.git/*' \
-          ! -path './__pycache__/*' \
-          ! -name '*.pyc' \
-          ! -name '.env' \
-          ! -path './logs/*.log' \
-          ! -path './.github/*' \
-          ! -name 'test_*.py' \
-          ! -name 'migrate_*.py' \
-          ! -name 'refactor_*.py' \
-          ! -name 'deploy.sh' \
-          ! -name 'DEPLOYMENT_SETUP.md' \
-          ! -name "cybermatches-deploy-${DEPLOY_TIMESTAMP}.tar.gz" \
-          -print0 | tar -czf "cybermatches-deploy-${DEPLOY_TIMESTAMP}.tar.gz" --null -T -
+        # Создаем простой архив с нужными файлами
+        tar -czf cybermatches-deploy.tar.gz \
+          main.py \
+          api.py \
+          improved_parser.py \
+          cyber_telegram_bot_refactored.py \
+          cleanup_placeholders.py \
+          update_scores.py \
+          find_match_urls.py \
+          requirements.txt \
+          systemd_services.tar.gz \
+          setup_services.sh \
+          --exclude='*.pyc' \
+          --exclude='.git' \
+          --exclude='__pycache__' \
+          --exclude='logs/*.log' \
+          --exclude='.env' \
+          2>/dev/null || true
+    
+    - name: Show package contents
+      run: |
+        echo "📦 Содержимое архива:"
+        tar -tzf cybermatches-deploy.tar.gz | head -20
+        echo "..."
+        echo "Всего файлов: $(tar -tzf cybermatches-deploy.tar.gz | wc -l)"
     
     - name: Copy files to server
       uses: appleboy/scp-action@v0.1.5
@@ -68,12 +59,11 @@ jobs:
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
         port: ${{ secrets.SERVER_PORT || '22' }}
-        source: "cybermatches-deploy-${{ env.DEPLOY_TIMESTAMP }}.tar.gz"
+        source: "cybermatches-deploy.tar.gz"
         target: "/tmp/"
-        strip_components: 0
         overwrite: true
     
-    - name: Prepare server for deployment
+    - name: Deploy to server
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.SERVER_HOST }}
@@ -81,170 +71,101 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         port: ${{ secrets.SERVER_PORT || '22' }}
         script: |
-          # Clean up old deployment files
-          sudo rm -rf /tmp/cybermatches-deploy.tar.gz /tmp/cybermatches-deploy 2>/dev/null || true
+          echo "=== НАЧИНАЕМ ДЕПЛОЙ ==="
           
-          # Stop services before deployment
+          # 1. Остановить сервисы
+          echo "⏹️ Останавливаем сервисы..."
           sudo systemctl stop cybermatches.service || true
           sudo systemctl stop cybermatches-api.service || true
           sudo systemctl stop cyber_telegram_bot.service || true
-    
-    - name: Deploy and restart services
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        password: ${{ secrets.SERVER_PASSWORD }}
-        port: ${{ secrets.SERVER_PORT || '22' }}
-        script: |
-          # Получаем timestamp из имени файла
-          TIMESTAMP_FILE=$(ls /tmp/cybermatches-deploy-*.tar.gz 2>/dev/null | head -1)
-          if [ -z "$TIMESTAMP_FILE" ]; then
-            echo "❌ Не найдено ни одного архива cybermatches-deploy-*.tar.gz"
-            exit 1
-          fi
           
-          # Извлекаем timestamp из имени файла
-          DEPLOY_TIMESTAMP=$(basename "$TIMESTAMP_FILE" | sed 's/cybermatches-deploy-//' | sed 's/.tar.gz//')
-          echo "=== Используем timestamp: $DEPLOY_TIMESTAMP ==="
-          
-          echo "=== ДЕБАГ: Начало деплоя ==="
-          echo "TIMESTAMP_FILE: $TIMESTAMP_FILE"
-          echo "DEPLOY_TIMESTAMP: $DEPLOY_TIMESTAMP"
-          
-          # Проверяем существование архива
-          echo "=== Проверка архива ==="
-          ls -la "/tmp/cybermatches-deploy-${DEPLOY_TIMESTAMP}.tar.gz" || echo "❌ Архив не найден!"
-          
-          # Показываем содержимое /tmp
-          echo "=== Содержимое /tmp ==="
-          ls -la /tmp/ | grep cybermatches || echo "❌ Нет cybermatches файлов в /tmp"
-          
-          # Backup current deployment
+          # 2. Создать резервную копию
+          echo "💾 Создаем резервную копию..."
           cd /root
           if [ -d "cybermatches" ]; then
-            echo "=== Создание бэкапа ==="
-            sudo mv cybermatches cybermatches-backup-$(date +%Y%m%d-%H%M%S) || true
+            sudo mv cybermatches cybermatches-backup-$(date +%Y%m%d-%H%M%S)
+            echo "✅ Резервная копия создана"
           fi
           
-          # Extract new deployment
-          echo "=== Извлечение нового деплоя ==="
+          # 3. Удалить старую папку и создать новую
+          echo "🗑️ Удаляем старую папку..."
           sudo rm -rf /root/cybermatches
           sudo mkdir -p /root/cybermatches
           
-          # Проверяем архив перед извлечением
-          if [ -f "/tmp/cybermatches-deploy-${DEPLOY_TIMESTAMP}.tar.gz" ]; then
-            echo "✅ Архив найден, извлекаем..."
-            sudo tar -xzf "/tmp/cybermatches-deploy-${DEPLOY_TIMESTAMP}.tar.gz" -C /root/cybermatches
-            echo "=== Проверка после извлечения ==="
-            ls -la /root/cybermatches/ || echo "❌ Папка пуста после извлечения!"
+          # 4. Извлечь архив
+          echo "📦 Извлекаем архив..."
+          if [ -f "/tmp/cybermatches-deploy.tar.gz" ]; then
+            sudo tar -xzf /tmp/cybermatches-deploy.tar.gz -C /root/cybermatches
+            echo "✅ Архив извлечен"
           else
-            echo "❌ Архив не найден! Деплой невозможен."
+            echo "❌ Архив не найден!"
             exit 1
           fi
           
+          # 5. Проверить содержимое
+          echo "🔍 Проверяем содержимое:"
+          ls -la /root/cybermatches/
+          
+          # 6. Установить права
           sudo chown -R root:root /root/cybermatches
+          sudo chmod 755 /root/cybermatches
           
-          # Create logs directory if not exists
-          sudo mkdir -p /root/cybermatches/logs
-          
-          # Copy environment file if exists in backup
-          if [ -f "/root/cybermatches-backup-*/.env" ]; then
-            sudo cp /root/cybermatches-backup-*/.env /root/cybermatches/.env
-          fi
-          
-          # Set proper permissions
-          sudo chmod 600 /root/cybermatches/.env || true
-          
-          # Создаем .env файл из GitHub Secrets
-          echo "📝 Создание .env файла из GitHub Secrets..."
+          # 7. Создать .env файл
+          echo "📝 Создаем .env файл..."
           cat > /root/cybermatches/.env << 'EOF'
           ${{ secrets.ENV }}
           EOF
           sudo chmod 600 /root/cybermatches/.env
-          echo "✅ .env файл создан успешно"
           
-          # Check and setup Python environment
+          # 8. Настроить Python окружение
+          echo "🐍 Настраиваем Python окружение..."
           cd /root/cybermatches
           
-          # Check if virtual environment exists, if not create it
+          # Создать виртуальное окружение если нет
           if [ ! -d ".venv" ]; then
             python3 -m venv .venv
           fi
           
-          # Activate virtual environment and install dependencies
+          # Активировать и установить зависимости
           source .venv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
-          pip install fastapi uvicorn[standard] || true
-          
-          # Deactivate virtual environment
+          pip install fastapi uvicorn || true
           deactivate
           
-          # Очистка БД от плейсхолдеров
-          echo "🧹 Очистка БД от плейсхолдеров команд..."
+          # 9. Очистить плейсхолдеры
+          echo "🧹 Очищаем плейсхолдеры..."
           cd /root/cybermatches
           source .venv/bin/activate
           python3 cleanup_placeholders.py || echo "⚠️ Очистка завершилась с предупреждением"
           deactivate
           
-          # Reload systemd and restart services
+          # 10. Перезапустить сервисы
+          echo "🔄 Перезапускаем сервисы..."
           sudo systemctl daemon-reload
           sudo systemctl enable cybermatches.service cybermatches-api.service cyber_telegram_bot.service
           sudo systemctl restart cybermatches.service cybermatches-api.service cyber_telegram_bot.service
           
-          # Финальная проверка и сохранение состояния
-          echo "=== ФИНАЛЬНАЯ ПРОВЕРКА ==="
-          
-          # Проверяем абсолютный путь
-          echo "Проверяем абсолютный путь /root/cybermatches:"
-          ls -la /root/cybermatches/ 2>/dev/null || echo "❌ /root/cybermatches не существует"
-          
-          # Проверяем текущую директорию
-          echo "Текущая директория: $(pwd)"
-          echo "Содержимое текущей директории:"
-          ls -la 2>/dev/null || echo "❌ Текущая директория пуста"
-          
-          # Проверяем, где мы находимся
-          echo "Полный путь текущей директории: $(pwd)"
-          echo "Проверяем родительскую директорию:"
-          ls -la ../ 2>/dev/null || echo "❌ Родительская директория пуста"
-          
-          # Проверяем все возможные места
-          echo "Проверяем /home/:"
-          ls -la /home/ 2>/dev/null || echo "❌ /home/ пуста"
-          
-          echo "Проверяем /tmp/:"
-          ls -la /tmp/ 2>/dev/null | grep -E "(cybermatches|main\.py)" || echo "❌ В /tmp/ нет cybermatches файлов"
-          
-          # Создаем файл с информацией о деплое в любом случае
-          mkdir -p /root/cybermatches
-          echo "Деплой завершен: $(date)" > /root/cybermatches/DEPLOY_INFO.txt
-          echo "Timestamp: $DEPLOY_TIMESTAMP" >> /root/cybermatches/DEPLOY_INFO.txt
-          echo "Путь извлечения: /root/cybermatches" >> /root/cybermatches/DEPLOY_INFO.txt
-          echo "Текущая директория: $(pwd)" >> /root/cybermatches/DEPLOY_INFO.txt
-          echo "Проверка после извлечения:" >> /root/cybermatches/DEPLOY_INFO.txt
-          ls -la /root/cybermatches/ 2>/dev/null >> /root/cybermatches/DEPLOY_INFO.txt || echo "Папка пуста" >> /root/cybermatches/DEPLOY_INFO.txt
-          
-          # Wait and check status with detailed logging
-          sleep 5
-          echo "=== Service Status Check ==="
+          # 11. Проверить статус
+          echo "📊 Проверяем статус сервисов:"
+          sleep 3
           sudo systemctl is-active cybermatches.service && echo "✅ Parser: ACTIVE" || echo "❌ Parser: FAILED"
           sudo systemctl is-active cybermatches-api.service && echo "✅ API: ACTIVE" || echo "❌ API: FAILED"
           sudo systemctl is-active cyber_telegram_bot.service && echo "✅ Bot: ACTIVE" || echo "❌ Bot: FAILED"
           
-          echo "=== Recent Logs ==="
+          # 12. Показать последние логи
+          echo "📋 Последние логи:"
           echo "--- Parser ---"
-          sudo tail -n 5 /root/cybermatches/logs/parser.log 2>/dev/null || echo "No parser logs"
+          sudo tail -n 3 /root/cybermatches/logs/parser.log 2>/dev/null || echo "Нет логов парсера"
           echo "--- API ---"
-          sudo tail -n 5 /root/cybermatches/logs/api.log 2>/dev/null || echo "No API logs"
-          echo "--- Bot ---"
-          sudo tail -n 5 /root/cybermatches/logs/bot.log 2>/dev/null || echo "No bot logs"
+          sudo tail -n 3 /root/cybermatches/logs/api.log 2>/dev/null || echo "Нет логов API"
           
-          # Clean up with error handling
-          sudo rm -rf /tmp/cybermatches-deploy.tar.gz /tmp/cybermatches-deploy 2>/dev/null || true
+          echo "=== ДЕПЛОЙ ЗАВЕРШЕН ==="
+          
+          # 13. Очистка
+          sudo rm -f /tmp/cybermatches-deploy.tar.gz
     
-    - name: Cleanup old backups
+    - name: Test deployment
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.SERVER_HOST }}
@@ -252,6 +173,26 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         port: ${{ secrets.SERVER_PORT || '22' }}
         script: |
-          # Keep only last 5 backups
-          cd /root
-          ls -dt cybermatches-backup-* | tail -n +6 | xargs sudo rm -rf || true
+          echo "=== ТЕСТИРУЕМ ДЕПЛОЙ ==="
+          
+          # Проверить, что файлы есть
+          echo "📁 Проверяем файлы:"
+          ls -la /root/cybermatches/main.py
+          ls -la /root/cybermatches/api.py
+          ls -la /root/cybermatches/improved_parser.py
+          
+          # Проверить, что сервисы работают
+          echo "🔍 Проверяем сервисы:"
+          sudo systemctl status cybermatches.service --no-pager -l
+          sudo systemctl status cybermatches-api.service --no-pager -l
+          
+          # Проверить API
+          echo "🌐 Проверяем API:"
+          curl -s http://localhost:8050/health || echo "API не отвечает"
+          
+          echo "✅ Тестирование завершено"
+    
+    - name: Cleanup old backups
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SE

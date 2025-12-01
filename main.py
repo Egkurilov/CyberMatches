@@ -252,532 +252,14 @@ def sync_tournaments_from_main_page() -> None:
     )
 
 
-def split_matches_by_datetime(block: str) -> list[tuple[str, str]]:
-    """
-    Разбиваем большой текст на куски вида:
-    "Month 25, 2025 - 17:15 MSK <остальной текст матча> ..."
-    """
-    pattern = re.compile(
-        r"([A-Z][a-z]+ \d{1,2}, \d{4} - \d{1,2}:\d{2} [A-Z]+)\s+"
-        r"(.*?)(?=(?:[A-Z][a-z]+ \d{1,2}, \d{4} - \d{1,2}:\d{2} [A-Z]+)|$)",
-        re.DOTALL,
-    )
-    segments: list[tuple[str, str]] = []
-    for m in pattern.finditer(block):
-        time_part = m.group(1).strip()
-        body = re.sub(r"\s+", " ", m.group(2)).strip()
-        segments.append((time_part, body))
-    return segments
-
-
-def clean_body(body: str) -> str:
-    """Чистим мусорные куски типа 'Watch now' и прочее."""
-    for junk in [
-        "Show Countdown",
-        "Watch now",
-        "Watch here",
-        "+ Add details",
-        "+ Details",
-        "Add details",
-        "Details",
-    ]:
-        body = body.replace(junk, " ")
-    # иногда между Bo3 и командой/турниром бывает точка
-    body = body.replace("). ", ") ")
-    body = re.sub(r"\s+", " ", body).strip()
-    return body
-
-
-def clean_tournament_name(tournament_name: str) -> str:
-    """
-    Очистка названия турнира от лишних суффиксов:
-    - "BB Streamers Battle 12 - Playoffs" -> "BB Streamers Battle 12"
-    - "BLAST Slam V - November 29-A" -> "BLAST Slam V"
-    - "CCT S2 Series 6 - Group B" -> "CCT S2 Series 6"
-    - "PGL Wallachia S6 - Playoffs" -> "PGL Wallachia S6"
-    - "Tournament Name - Some Other Stuff" -> "Tournament Name"
-    """
-    if not tournament_name:
-        return tournament_name
-    
-    # Удаляем суффиксы вида " - Playoffs", " - November 29-A", " - Group B" и т.д.
-    # Оставляем только основное название турнира
-    # Улучшенное регулярное выражение для более универсальной очистки
-    cleaned = re.split(r'\s*-\s*(?:Playoffs|Group\s+[A-Z]|November\s+\d+-[A-Z]|Play-In|Playoffs|Some\s+Other\s+Stuff)', tournament_name, 1)[0]
-    
-    # Удаляем лишние пробелы в начале и конце
-    cleaned = cleaned.strip()
-    
-    return cleaned
-
-
-def resolve_tournament_name(raw_tail: str | None) -> str | None:
-    """Нормализуем название турнира на основе хвоста строки и справочника турниров.
-
-    1. Чистим очевидный мусор типа 'View match details', 'Watch VOD'.
-    2. Пробуем найти в хвосте одно из канонических имён турниров
-       из KNOWN_TOURNAMENTS_BY_NAME (берём самое длинное совпадение).
-    3. Если ничего не нашли — возвращаем часть до ' - ' как более общий вариант.
-    4. Применяем очистку от лишних суффиксов.
-    """
-    if not raw_tail:
-        return None
-
-    tail = re.sub(r"View match details", "", raw_tail, flags=re.IGNORECASE)
-    tail = re.sub(r"Watch VOD", "", tail, flags=re.IGNORECASE)
-    tail = re.sub(r"\s+", " ", tail).strip()
-    if not tail:
-        return None
-
-    # Сначала пробуем найти каноническое имя турнира
-    if KNOWN_TOURNAMENTS_BY_NAME:
-        names_sorted = sorted(KNOWN_TOURNAMENTS_BY_NAME.keys(), key=len, reverse=True)
-        low_tail = tail.lower()
-        for name in names_sorted:
-            if name.lower() in low_tail:
-                # Применяем очистку к найденному названию
-                return clean_tournament_name(name)
-
-    # Фоллбек: отрезаем суффиксы вида ' - November 27-A' и применяем очистку
-    base = tail.split(" - ", 1)[0].strip()
-    return clean_tournament_name(base) if base else None
-
-
-def convert_time_to_msk_dt(time_raw: str | None) -> datetime | None:
-    """
-    time_raw в виде "November 26, 2025 - 12:00 SGT"
-    -> datetime в МСК.
-    """
-    if not time_raw:
-        return None
-    return parse_time_to_msk(time_raw)
-
-
-def parse_score_numbers(score: str | None) -> tuple[int | None, int | None]:
-    """
-    '1:1 Bo3' -> (1, 1)
-    '2:0'      -> (2, 0)
-    """
-    if not score:
-        return None, None
-    try:
-        first_part = score.split()[0]  # '1:1 Bo3' -> '1:1'
-        s1_str, s2_str = first_part.split(":")
-        return int(s1_str), int(s2_str)
-    except Exception:
-        return None, None
-
-
-def parse_bo_int(bo: str | None) -> int | None:
-    """
-    'Bo3' -> 3
-    'Bo1' -> 1
-    None  -> None
-    """
-    if not bo:
-        return None
-    m = re.search(r"Bo(\d+)", bo)
-    if not m:
-        return None
-    try:
-        return int(m.group(1))
-    except Exception:
-        return None
-
-
-def compute_status(
-    now_msk: datetime,
-    match_time_msk: datetime | None,
-    score: str | None,
-    status_hint: str | None,
-) -> str:
-    """
-    Простейшая логика статуса:
-    - если есть счёт -> finished
-    - если статус из HTML 'live' -> live
-    - если время > now + 5 минут -> upcoming
-    - если now > time + 4 часа -> finished
-    - иначе live
-    """
-    if score:
-        return "finished"
-
-    if status_hint and status_hint.lower() in {"live", "finished", "upcoming"}:
-        return status_hint.lower()
-
-    if not match_time_msk:
-        return "unknown"
-
-    if now_msk < match_time_msk - timedelta(minutes=5):
-        return "upcoming"
-
-    end_est = match_time_msk + timedelta(hours=4)
-    if now_msk > end_est:
-        return "finished"
-
-    return "live"
-
-
-def parse_matches_in_container(root: BeautifulSoup, assume_finished: bool) -> list[Match]:
-    """
-    Парсим матчи внутри одного контейнера (либо Upcoming, либо Completed).
-    assume_finished=True для вкладки Completed, чтобы сразу пометить матчи finished.
-    """
-    # 1) Текстовый блок
-    text_block = root.get_text(" ", strip=True)
-    text_block = re.sub(r"\s+", " ", text_block).strip()
-
-    segments = split_matches_by_datetime(text_block)
-
-    # 2) Локальные detail-ссылки внутри этого контейнера
-    detail_links: list[str] = []
-    for a in root.find_all("a", href=True):
-        href = a["href"]
-        if href.startswith("/dota2/Match:"):
-            detail_links.append(urljoin(BASE_URL, href))
-
-    print(f"[DEBUG] container({'Completed' if assume_finished else 'Upcoming'}) detail_links: {len(detail_links)}")
-
-    # На всякий случай делаем множество, чтобы убрать дубли
-    detail_links = list(dict.fromkeys(detail_links))
-
-    # 3) Сопоставляем матчи с URL-ами
-    # Создаем словарь для быстрого поиска URL по командам
-    url_by_teams = {}
-    for url in detail_links:
-        # Извлекаем ID матча из URL для сопоставления
-        match_id = url.split('/')[-1] if '/' in url else url
-        url_by_teams[match_id] = url
-
-    matches: list[Match] = []
-    for time_part, body in segments:
-        m = parse_body(time_part, body)
-        if not m:
-            continue
-
-        if assume_finished:
-            m.status = "finished"
-
-        # Пытаемся найти URL для этого матча
-        if m.team1 and m.team2:
-            # Создаем возможные ключи для поиска
-            team_key = f"{m.team1} vs {m.team2}"
-            reverse_key = f"{m.team2} vs {m.team1}"
-            
-            # Ищем URL по ключевым словам из матча
-            for url in detail_links:
-                # Проверяем, содержит ли URL названия команд
-                url_lower = url.lower()
-                if (m.team1.lower() in url_lower and m.team2.lower() in url_lower) or \
-                   (m.team2.lower() in url_lower and m.team1.lower() in url_lower):
-                    m.match_url = url
-                    print(f"[DEBUG] Найден URL для матча {m.team1} vs {m.team2}: {url}")
-                    break
-            
-            # Если не нашли по командам, пробуем по времени и турниру
-            if not m.match_url and detail_links:
-                # Берем первый доступный URL для матчей без URL
-                m.match_url = detail_links[0] if detail_links else None
-                if m.match_url:
-                    print(f"[DEBUG] Назначен URL по умолчанию для матча {m.team1} vs {m.team2}: {m.match_url}")
-
-        matches.append(m)
-
-    return matches
-
-
-# ------------ Парсинг одного матча из текста ------------
-
-def parse_body(time_part: str, body: str) -> Match | None:
-    body = clean_body(body)
-
-    # Обработка плейсхолдеров команд (#5, #8, TBD и т.д.)
-    # Улучшенное регулярное выражение для более гибкой обработки
-    placeholder_pattern = re.compile(r'^(#\d+|TBD)\s+(#\d+|TBD)(?:\s+\((Bo\d+)\))?(?:\s+(.*))?$')
-    placeholder_match = placeholder_pattern.match(body)
-    if placeholder_match:
-        team1 = placeholder_match.group(1)
-        team2 = placeholder_match.group(2)
-        bo = placeholder_match.group(3) or "Bo1"  # По умолчанию Bo1
-        tail = placeholder_match.group(4) or ""
-        tournament = resolve_tournament_name(tail) if tail else None
-
-        time_msk = convert_time_to_msk_dt(time_part)
-        return Match(
-            time_raw=time_part,
-            time_msk=time_msk,
-            team1=team1,
-            team2=team2,
-            score=None,
-            bo=bo,
-            tournament=tournament,
-            status=None,
-        )
-
-    # Универсальный кейс со счётом ДО team2:
-    # "Travo 1 : 1 (Bo3) Stray BB Streamers Battle 12 - Playoffs"
-    # "Komodo 0:2(Bo3). YG Lunar Snake 4 - November 26"
-    m_score_a = re.match(
-        r"^(?P<team1>.+?)\s+"
-        r"(?P<s1>\d+)\s*[:\-]?\s*(?P<s2>\d+)\s*"   # допускаем '0:2', '0 2', '0 - 2'
-        r"\((?P<bo>Bo\d+)\)\.?\s+"                 # допускаем точку после (Bo3)
-        r"(?P<team2>\S+)\s*"
-        r"(?P<tail>.*)$",
-        body,
-    )
-    if m_score_a:
-        team1 = m_score_a.group("team1").strip()
-        s1 = m_score_a.group("s1")
-        s2 = m_score_a.group("s2")
-        bo = m_score_a.group("bo")
-        team2 = m_score_a.group("team2").strip()
-        tail = m_score_a.group("tail").strip()
-        tournament = resolve_tournament_name(tail) if tail else None
-        score = f"{s1}:{s2} {bo}"
-
-        time_msk = convert_time_to_msk_dt(time_part)
-        return Match(
-            time_raw=time_part,
-            time_msk=time_msk,
-            team1=team1,
-            team2=team2,
-            score=score,
-            bo=bo,
-            tournament=tournament,
-            status=None,
-        )
-
-    # Кейс со счётом ПОСЛЕ team2:
-    # "Travo Stray 2:1 (Bo3) BB Streamers Battle 12 - Playoffs"
-    # "Travo Stray 2 1 (Bo3) BB Streamers Battle 12 - Playoffs"
-    m_score_b = re.match(
-        r"^(?P<team1>\S+)\s+"
-        r"(?P<team2>\S+)\s+"
-        r"(?P<s1>\d+)\s*[:\-]?\s*(?P<s2>\d+)\s*"
-        r"\((?P<bo>Bo\d+)\)\s*"
-        r"(?P<tail>.*)$",
-        body,
-    )
-    if m_score_b:
-        team1 = m_score_b.group("team1").strip()
-        s1 = m_score_b.group("s1")
-        s2 = m_score_b.group("s2")
-        team2 = m_score_b.group("team2").strip()
-        bo = m_score_b.group("bo")
-        tail = m_score_b.group("tail").strip()
-        tournament = resolve_tournament_name(tail) if tail else None
-        score = f"{s1}:{s2} {bo}"
-
-        time_msk = convert_time_to_msk_dt(time_part)
-        return Match(
-            time_raw=time_part,
-            time_msk=time_msk,
-            team1=team1,
-            team2=team2,
-            score=score,
-            bo=bo,
-            tournament=tournament,
-            status=None,
-        )
-
-    # Кейс без счёта, классический 'team1 vs (Bo3) team2 Tournament ...'
-    # "Tidebd vs (Bo1) TT BLAST Slam V - November 25-A ..."
-    m_vs = re.match(
-        r"^(?P<team1>.+?)\s+vs\s+\((?P<bo>Bo\d+)\)\s+(?P<tail>.+)$",
-        body,
-    )
-    if m_vs:
-        team1 = m_vs.group("team1").strip()
-        bo = m_vs.group("bo")
-        tail = m_vs.group("tail").strip()
-
-        tokens = tail.split()
-        if len(tokens) < 2:
-            return None
-        team2 = tokens[0]
-        tournament = resolve_tournament_name(" ".join(tokens[1:]).strip())
-
-        time_msk = convert_time_to_msk_dt(time_part)
-        return Match(
-            time_raw=time_part,
-            time_msk=time_msk,
-            team1=team1,
-            team2=team2,
-            score=None,
-            bo=bo,
-            tournament=tournament,
-            status=None,
-        )
-
-    # 4) кейс типа "Recrent : (Bo3) VDS ..."
-    m_colon = re.match(
-        r"^(?P<team1>.+?):\s+\((?P<bo>Bo\d+)\)\s+(?P<tail>.+)$",
-        body,
-    )
-    if m_colon:
-        team1 = m_colon.group("team1").strip()
-        bo = m_colon.group("bo")
-        tail = m_colon.group("tail").strip()
-
-        tokens = tail.split()
-        if len(tokens) < 2:
-            return None
-        team2 = tokens[0]
-        tournament = resolve_tournament_name(" ".join(tokens[1:]).strip())
-
-        time_msk = convert_time_to_msk_dt(time_part)
-        return Match(
-            time_raw=time_part,
-            time_msk=time_msk,
-            team1=team1,
-            team2=team2,
-            score=None,
-            bo=bo,
-            tournament=tournament,
-            status=None,
-        )
-
-    # Отладка: если в строке есть 'Bo' и цифры — подсветим
-    if "Bo" in body and re.search(r"\d", body):
-        print(f"[WARN] не смогли распарсить счёт из тела:\n{body}\n---")
-
-    return None
-
-
 def parse_matches(html: str) -> list[Match]:
-    soup = BeautifulSoup(html, "lxml")
+    """
+    Используем улучшенный парсер из improved_parser.py
+    """
+    # Импортируем функцию из improved_parser
+    from improved_parser import parse_matches_from_html
+    return parse_matches_from_html(html)
 
-    print(f"[DEBUG] Начинаем парсинг новой структуры страницы...")
-    
-    # Новая структура Liquipedia - матчи в div с классами new-match-style и match-info
-    all_matches: list[Match] = []
-    
-    # Ищем контейнеры с матчами нового формата
-    match_containers = soup.find_all('div', class_=['new-match-style', 'match-info'])
-    
-    print(f"[DEBUG] Найдено контейнеров нового формата: {len(match_containers)}")
-    
-    if not match_containers:
-        # Пробуем альтернативные селекторы
-        match_containers = soup.find_all('div', class_=lambda x: x and 'match' in x.lower() and not any(word in str(x).lower() for word in ['menu', 'nav', 'header', 'footer', 'sidebar', 'rematch']))
-        print(f"[DEBUG] Найдено контейнеров с match в классе (фильтровано): {len(match_containers)}")
-
-    for container in match_containers:
-        try:
-            # Ищем время матча
-            time_elem = container.find(['span', 'div'], class_=lambda x: x and 'timer-object' in str(x))
-            if not time_elem:
-                time_elem = container.find(['span', 'div'], class_=lambda x: x and any(word in str(x).lower() for word in ['time', 'date', 'countdown']))
-            
-            if not time_elem:
-                continue
-                
-            time_text = time_elem.get_text(strip=True)
-            
-            # Ищем команды
-            team_elems = container.find_all(['span', 'div'], class_=lambda x: x and 'team' in str(x).lower())
-            teams = []
-            for team_elem in team_elems:
-                team_text = team_elem.get_text(strip=True)
-                if team_text and team_text not in teams and len(team_text) > 1:
-                    teams.append(team_text)
-            
-            if len(teams) < 2:
-                continue
-                
-            team1, team2 = teams[0], teams[1]
-            
-            # Ищем формат Bo
-            bo_elem = container.find(['span', 'div'], string=lambda x: x and 'Bo' in str(x))
-            bo = None
-            if bo_elem:
-                bo = bo_elem.get_text(strip=True)
-            else:
-                # Ищем в тексте
-                bo_match = re.search(r'\(Bo\d+\)', container.get_text())
-                if bo_match:
-                    bo = bo_match.group(0)
-            
-            # Ищем ссылку на матч
-            match_link = container.find('a', href=lambda x: x and '/dota2/Match:' in x)
-            match_url = None
-            if match_link:
-                match_url = urljoin('https://liquipedia.net', match_link.get('href'))
-            
-            # Ищем счет в завершенных матчах
-            score = None
-            
-            # Проверяем, завершен ли матч (есть ли winner/loser классы)
-            winner_elem = container.find(['div', 'span'], class_='match-info-header-winner')
-            loser_elem = container.find(['div', 'span'], class_='match-info-header-loser')
-            
-            if winner_elem or loser_elem:
-                # Матч завершен, ищем счет
-                score_wrapper = container.find('span', class_='match-info-header-scoreholder-scorewrapper')
-                if score_wrapper:
-                    scores = score_wrapper.find_all('span', class_='match-info-header-scoreholder-score')
-                    if len(scores) >= 2:
-                        score1 = scores[0].get_text(strip=True)
-                        score2 = scores[1].get_text(strip=True)
-                        score = f"{score1}:{score2}"
-                    
-                    # Ищем Bo формат
-                    bo_lower = score_wrapper.find('span', class_='match-info-header-scoreholder-lower')
-                    if bo_lower and not bo:
-                        bo = bo_lower.get_text(strip=True)
-                
-                # Если матч завершен, но счет не найден, ставим статус finished
-                if not score:
-                    status = 'finished'  # Матч завершен, но счет не найден
-            else:
-                # Матч не завершен, определяем статус по времени
-                if time_msk:
-                    now_msk = datetime.now(timezone(timedelta(hours=3)))
-                    if now_msk > time_msk + timedelta(hours=4):
-                        status = 'finished'  # Прошло более 4 часов, считаем завершенным
-                    elif now_msk > time_msk - timedelta(minutes=5):
-                        status = 'live'  # Матч идет прямо сейчас
-                    else:
-                        status = 'upcoming'  # Матч в будущем
-            
-            # Ищем турнир
-            tournament = None
-            tournament_elem = container.find(['span', 'div'], class_=lambda x: x and any(word in str(x).lower() for word in ['tournament', 'league', 'event']))
-            if tournament_elem:
-                tournament = tournament_elem.get_text(strip=True)
-            else:
-                # Ищем в ссылках
-                tournament_link = container.find('a', href=lambda x: x and any(word in str(x).lower() for word in ['tournament', 'league']))
-                if tournament_link:
-                    tournament = tournament_link.get_text(strip=True)
-            
-            # Создаем объект матча
-            time_msk = parse_time_to_msk(time_text)
-            
-            match = Match(
-                time_raw=time_text,
-                time_msk=time_msk,
-                team1=team1,
-                team2=team2,
-                score=score,
-                bo=bo,
-                tournament=tournament,
-                status=status,
-                match_url=match_url
-            )
-            
-            all_matches.append(match)
-            print(f"[DEBUG] Спарсен матч: {team1} vs {team2}, время: {time_text}, счет: {score}, URL: {match_url}")
-            
-        except Exception as e:
-            print(f"[DEBUG] Ошибка при парсинге контейнера: {e}")
-            continue
-
-    print(f"[DEBUG] Всего спарсено матчей: {len(all_matches)}")
-    return all_matches
-
-
-# ------------ Работа с БД ------------
 
 def get_db_connection() -> psycopg.Connection:
     return psycopg.connect(
@@ -1010,49 +492,6 @@ def refresh_statuses_in_db() -> None:
     print("Обновили статус по времени у матчей")
 
 
-def get_completed_text_from_main() -> str | None:
-    """
-    Дополнительный источник: Completed-блок с главной страницы.
-    Можно использовать для подтягивания счёта, если он есть там.
-    """
-    try:
-        html = fetch_html(URL)
-        soup = BeautifulSoup(html, "lxml")
-        completed = soup.find("div", id="completed-matches")
-        if not completed:
-            return None
-        return completed.get_text(" ", strip=True)
-    except Exception as e:
-        log_event(
-            {
-                "level": "error",
-                "msg": "get_completed_text_failed",
-                "error": str(e),
-            }
-        )
-        return None
-
-
-def fetch_score_from_main_completed(team1: str, team2: str, tournament: str | None) -> str | None:
-    """
-    Пробуем вытащить счёт из Completed-блока, если страница матча ещё не прогрузилась.
-    """
-    completed_text = get_completed_text_from_main()
-    if not completed_text:
-        return None
-
-    pattern = re.compile(
-        rf"{re.escape(team1)}.*?(\d+[:\-]\d+).*?{re.escape(team2)}",
-        re.IGNORECASE | re.DOTALL,
-    )
-    m = pattern.search(completed_text)
-    if not m:
-        return None
-
-    score_part = m.group(1)
-    return score_part
-
-
 def fetch_score_from_match_page(match_url: str) -> tuple[str | None, str | None]:
     """
     Тянем страницу конкретного матча и пытаемся вытащить оттуда счёт и Bo.
@@ -1111,18 +550,6 @@ def fetch_score_from_match_page(match_url: str) -> tuple[str | None, str | None]
         bo_match = re.search(r"Bo(\d+)", soup.get_text())
         if bo_match:
             bo = f"Bo{bo_match.group(1)}"
-    
-    # 4. Специальная проверка для конкретного примера
-    if "Match:ID_Cto8wPoyyH_R02-M002" in match_url:
-        print(f"[DEBUG] Парсим конкретный матч: {match_url}")
-        # Ищем специфические элементы для этого матча
-        score_elements = soup.find_all(['div', 'span'], string=re.compile(r'\d+:\d+'))
-        for elem in score_elements:
-            text = elem.get_text(strip=True)
-            if re.match(r'^\d+:\d+$', text):
-                score = text
-                print(f"[DEBUG] Найден счет: {score}")
-                break
     
     print(f"[DEBUG] Извлечен счет: {score}, Bo: {bo} для {match_url}")
     return score, bo
@@ -1206,6 +633,46 @@ def update_scores_from_match_pages() -> None:
     print(f"  ❌ Ошибок: {errors}")
 
 
+def clean_tournament_name(tournament_name: str) -> str:
+    """
+    Очистка названия турнира от лишних суффиксов:
+    - "BB Streamers Battle 12 - Playoffs" -> "BB Streamers Battle 12"
+    - "BLAST Slam V - November 29-A" -> "BLAST Slam V"
+    - "CCT S2 Series 6 - Group B" -> "CCT S2 Series 6"
+    - "PGL Wallachia S6 - Playoffs" -> "PGL Wallachia S6"
+    - "Tournament Name - Some Other Stuff" -> "Tournament Name"
+    """
+    if not tournament_name:
+        return tournament_name
+    
+    # Удаляем суффиксы вида " - Playoffs", " - November 29-A", " - Group B" и т.д.
+    # Оставляем только основное название турнира
+    # Улучшенное регулярное выражение для более универсальной очистки
+    cleaned = re.split(r'\s*-\s*(?:Playoffs|Group\s+[A-Z]|November\s+\d+-[A-Z]|Play-In|Playoffs|Some\s+Other\s+Stuff)', tournament_name, 1)[0]
+    
+    # Удаляем лишние пробелы в начале и конце
+    cleaned = cleaned.strip()
+    
+    return cleaned
+
+
+def parse_bo_int(bo: str | None) -> int | None:
+    """
+    'Bo3' -> 3
+    'Bo1' -> 1
+    None  -> None
+    """
+    if not bo:
+        return None
+    m = re.search(r"Bo(\d+)", bo)
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except Exception:
+        return None
+
+
 def worker_once() -> dict:
     """
     Один проход парсера, возвращает метрики для лога.
@@ -1217,19 +684,47 @@ def worker_once() -> dict:
 
     html = fetch_html(URL)
 
-    matches = parse_matches(html)
+    # Используем улучшенный парсер
+    from improved_parser import parse_matches_from_html
+    matches = parse_matches_from_html(html)
+    
     total = len(matches)
     print(f"Распарсили матчей: {total}")
 
     status_counts = {"upcoming": 0, "live": 0, "finished": 0, "unknown": 0}
     for m in matches:
-        st = (m.status or "unknown").lower()
+        # Улучшенный парсер возвращает словари, а не объекты Match
+        if isinstance(m, dict):
+            st = (m.get("status") or "unknown").lower()
+        else:
+            st = (m.status or "unknown").lower()
         if st not in status_counts:
             status_counts["unknown"] += 1
         else:
             status_counts[st] += 1
 
-    save_matches_to_db(matches)
+    # Сохраняем матчи в БД
+    if matches:
+        # Конвертируем словари в объекты Match
+        match_objects = []
+        for match_data in matches:
+            if isinstance(match_data, dict):
+                match_obj = Match(
+                    time_raw=match_data.get("time_raw"),
+                    time_msk=match_data.get("time_msk"),
+                    team1=match_data.get("team1"),
+                    team2=match_data.get("team2"),
+                    score=match_data.get("score"),
+                    bo=match_data.get("bo"),
+                    tournament=match_data.get("tournament"),
+                    status=match_data.get("status"),
+                    match_url=match_data.get("match_url")
+                )
+                match_objects.append(match_obj)
+            else:
+                match_objects.append(match_data)
+        save_matches_to_db(match_objects)
+    
     refresh_statuses_in_db()
     update_scores_from_match_pages()
 

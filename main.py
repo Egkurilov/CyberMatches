@@ -688,13 +688,13 @@ def parse_matches(html: str) -> list[Match]:
             team1, team2 = teams[0], teams[1]
             
             # Ищем формат Bo
-            bo_elem = container.find(['span', 'div'], text=lambda x: x and 'Bo' in x)
+            bo_elem = container.find(['span', 'div'], string=lambda x: x and 'Bo' in str(x))
             bo = None
             if bo_elem:
-                bo = bo_elem.strip()
+                bo = bo_elem.get_text(strip=True)
             else:
                 # Ищем в тексте
-                bo_match = re.search(r'\\(Bo\\d+\\)', container.get_text())
+                bo_match = re.search(r'\(Bo\d+\)', container.get_text())
                 if bo_match:
                     bo = bo_match.group(0)
             
@@ -704,13 +704,41 @@ def parse_matches(html: str) -> list[Match]:
             if match_link:
                 match_url = urljoin('https://liquipedia.net', match_link.get('href'))
             
-            # Ищем счет
+            # Ищем счет в завершенных матчах
             score = None
-            score_elem = container.find(['span', 'div'], class_=lambda x: x and 'score' in str(x).lower())
-            if score_elem:
-                score_text = score_elem.get_text(strip=True)
-                if re.match(r'\\d+:\\d+', score_text):
-                    score = score_text
+            
+            # Проверяем, завершен ли матч (есть ли winner/loser классы)
+            winner_elem = container.find(['div', 'span'], class_='match-info-header-winner')
+            loser_elem = container.find(['div', 'span'], class_='match-info-header-loser')
+            
+            if winner_elem or loser_elem:
+                # Матч завершен, ищем счет
+                score_wrapper = container.find('span', class_='match-info-header-scoreholder-scorewrapper')
+                if score_wrapper:
+                    scores = score_wrapper.find_all('span', class_='match-info-header-scoreholder-score')
+                    if len(scores) >= 2:
+                        score1 = scores[0].get_text(strip=True)
+                        score2 = scores[1].get_text(strip=True)
+                        score = f"{score1}:{score2}"
+                    
+                    # Ищем Bo формат
+                    bo_lower = score_wrapper.find('span', class_='match-info-header-scoreholder-lower')
+                    if bo_lower and not bo:
+                        bo = bo_lower.get_text(strip=True)
+                
+                # Если матч завершен, но счет не найден, ставим статус finished
+                if not score:
+                    status = 'finished'  # Матч завершен, но счет не найден
+            else:
+                # Матч не завершен, определяем статус по времени
+                if time_msk:
+                    now_msk = datetime.now(timezone(timedelta(hours=3)))
+                    if now_msk > time_msk + timedelta(hours=4):
+                        status = 'finished'  # Прошло более 4 часов, считаем завершенным
+                    elif now_msk > time_msk - timedelta(minutes=5):
+                        status = 'live'  # Матч идет прямо сейчас
+                    else:
+                        status = 'upcoming'  # Матч в будущем
             
             # Ищем турнир
             tournament = None
@@ -722,9 +750,6 @@ def parse_matches(html: str) -> list[Match]:
                 tournament_link = container.find('a', href=lambda x: x and any(word in str(x).lower() for word in ['tournament', 'league']))
                 if tournament_link:
                     tournament = tournament_link.get_text(strip=True)
-            
-            # Определяем статус по времени
-            status = "upcoming"  # По умолчанию
             
             # Создаем объект матча
             time_msk = parse_time_to_msk(time_text)
@@ -742,7 +767,7 @@ def parse_matches(html: str) -> list[Match]:
             )
             
             all_matches.append(match)
-            print(f"[DEBUG] Спарсен матч: {team1} vs {team2}, время: {time_text}, URL: {match_url}")
+            print(f"[DEBUG] Спарсен матч: {team1} vs {team2}, время: {time_text}, счет: {score}, URL: {match_url}")
             
         except Exception as e:
             print(f"[DEBUG] Ошибка при парсинге контейнера: {e}")

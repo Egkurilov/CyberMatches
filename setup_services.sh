@@ -56,7 +56,7 @@ Type=simple
 User=root
 WorkingDirectory=/root/cybermatches
 Environment=PYTHONPATH=/root/cybermatches
-ExecStart=/root/cybermatches/.venv/bin/python /root/cybermatches/cyber_telegram_bot_refactored.py
+ExecStart=/root/cybermatches/.venv/bin/python /root/cybermatches/cyber_telegram_bot.py
 Restart=always
 RestartSec=5
 StandardOutput=append:/root/cybermatches/logs/bot.log

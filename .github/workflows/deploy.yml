@@ -112,9 +112,9 @@ jobs:
           
           # 7. Создать .env файл
           echo "📝 Создаем .env файл..."
-          cat > /root/cybermatches/.env << 'EOF'
-          ${{ secrets.ENV }}
-          EOF
+          sudo bash -c 'cat > /root/cybermatches/.env << EOF
+'"${{ secrets.ENV }}"'
+EOF'
           sudo chmod 600 /root/cybermatches/.env
           
           # 8. Настроить Python окружение
@@ -195,4 +195,11 @@ jobs:
     - name: Cleanup old backups
       uses: appleboy/ssh-action@v1.0.0
       with:
-        host: ${{ secrets.SE
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        port: ${{ secrets.SERVER_PORT || '22' }}
+        script: |
+          # Keep only last 5 backups
+          cd /root
+          ls -dt cybermatches-backup-* | tail -n +6 | xargs sudo rm -rf || true

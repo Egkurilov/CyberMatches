@@ -3,6 +3,9 @@
 
 echo "🔧 Настройка systemd сервисов..."
 
+# Создаем директорию для логов
+sudo mkdir -p /root/cybermatches/logs
+
 # Parser Service
 sudo tee /etc/systemd/system/cybermatches.service > /dev/null <<'EOF'
 [Unit]
@@ -14,11 +17,9 @@ Type=simple
 User=root
 WorkingDirectory=/root/cybermatches
 Environment=PYTHONPATH=/root/cybermatches
-ExecStart=/root/cybermatches/.venv/bin/python /root/cybermatches/main.py
+ExecStart=/usr/bin/python3 /root/cybermatches/main.py
 Restart=always
 RestartSec=10
-StandardOutput=append:/root/cybermatches/logs/parser.log
-StandardError=append:/root/cybermatches/logs/parser.log
 
 [Install]
 WantedBy=multi-user.target
@@ -35,11 +36,9 @@ Type=simple
 User=root
 WorkingDirectory=/root/cybermatches
 Environment=PYTHONPATH=/root/cybermatches
-ExecStart=/root/cybermatches/.venv/bin/python -m uvicorn api:app --host 0.0.0.0 --port 8050
+ExecStart=/usr/bin/python3 -m uvicorn api:app --host 0.0.0.0 --port 8050
 Restart=always
 RestartSec=10
-StandardOutput=append:/root/cybermatches/logs/api.log
-StandardError=append:/root/cybermatches/logs/api.log
 
 [Install]
 WantedBy=multi-user.target
@@ -56,11 +55,9 @@ Type=simple
 User=root
 WorkingDirectory=/root/cybermatches
 Environment=PYTHONPATH=/root/cybermatches
-ExecStart=/root/cybermatches/.venv/bin/python /root/cybermatches/cyber_telegram_bot.py
+ExecStart=/usr/bin/python3 /root/cybermatches/cyber_telegram_bot.py
 Restart=always
 RestartSec=5
-StandardOutput=append:/root/cybermatches/logs/bot.log
-StandardError=append:/root/cybermatches/logs/bot.log
 
 [Install]
 WantedBy=multi-user.target
@@ -74,3 +71,6 @@ echo "✅ Включение сервисов..."
 sudo systemctl enable cybermatches.service cybermatches-api.service cyber_telegram_bot.service
 
 echo "🚀 Готово! Service файлы настроены."
+echo ""
+echo "💡 Примечание: Сервисы используют системный Python3"
+echo "   Для использования виртуального окружения, запустите setup_venv.sh после создания .venv"

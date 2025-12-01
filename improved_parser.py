@@ -18,7 +18,7 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9,ru;q=0.8",
 }
 
-def parse_time_to_msk(time_str: str) -> datetime | None:
+def parse_time_to_msk(time_str: str):
     """Парсим строки вида 'November 30, 2025 - 17:15 MSK' в datetime с tzinfo=MSK."""
     try:
         m = re.match(

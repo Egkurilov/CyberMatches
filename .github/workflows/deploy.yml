@@ -52,7 +52,7 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         port: ${{ secrets.SERVER_PORT || '22' }}
         source: "cybermatches-deploy.tar.gz"
-        target: "/tmp/"
+        target: "/root/"
         overwrite: true
     
     - name: Deploy to server
@@ -82,7 +82,7 @@ jobs:
           sudo mkdir -p /root/cybermatches
           
           # Извлечь архив
-          sudo tar -xzf /tmp/cybermatches-deploy.tar.gz -C /root/cybermatches
+          sudo tar -xzf /root/cybermatches-deploy.tar.gz -C /root/cybermatches
           
           # Установить права
           sudo chown -R root:root /root/cybermatches

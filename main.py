@@ -395,74 +395,75 @@ def save_matches_to_db(matches: list[Match]) -> None:
                         else:
                             updated_count += 1
                 else:
-                # Для матчей без liquipedia_match_id используем уникальную комбинацию полей
-                # Создаем уникальный ключ на основе времени, команд и турнира
-                unique_key = f"{m.time_msk.isoformat()}|{m.team1}|{m.team2}|{cleaned_tournament}|{m.bo}"
-                
-                try:
-                    cur.execute(
-                        """
-                        INSERT INTO dota_matches (
-                            match_time_msk,
-                            match_time_raw,
-                            team1,
-                            team2,
-                            score,
-                            bo,
-                            tournament,
-                            tournament_id,
-                            status,
-                            match_url
-                        )
-                        VALUES (
-                            %(match_time_msk)s,
-                            %(match_time_raw)s,
-                            %(team1)s,
-                            %(team2)s,
-                            %(score)s,
-                            %(bo)s,
-                            %(tournament)s,
-                            %(tournament_id)s,
-                            %(status)s,
-                            %(match_url)s
-                        )
-                        ON CONFLICT (match_time_msk, team1, team2, tournament, bo) DO UPDATE SET
-                            match_time_msk = EXCLUDED.match_time_msk,
-                            match_time_raw = EXCLUDED.match_time_raw,
-                            team1 = EXCLUDED.team1,
-                            team2 = EXCLUDED.team2,
-                            score = EXCLUDED.score,
-                            bo = EXCLUDED.bo,
-                            tournament = EXCLUDED.tournament,
-                            tournament_id = EXCLUDED.tournament_id,
-                            status = EXCLUDED.status,
-                            match_url = COALESCE(dota_matches.match_url, EXCLUDED.match_url),
-                            updated_at = now();
-                        """,
-                        {
-                            "match_time_msk": m.time_msk,
-                            "match_time_raw": m.time_raw,
-                            "team1": m.team1,
-                            "team2": m.team2,
-                            "score": m.score,
-                            "bo": bo_int,
-                            "tournament": cleaned_tournament,
-                            "tournament_id": tournament_id,
-                            "status": m.status or "unknown",
-                            "match_url": m.match_url,
-                        },
-                    )
-                except psycopg.errors.UniqueViolation:
-                    # Игнорируем дубликаты - это нормально, так как матчи могут дублироваться на странице
-                    print(f"[DEBUG] Пропускаем дубликат: {m.team1} vs {m.team2} в {cleaned_tournament}")
-                    continue
+                    # Для матчей без liquipedia_match_id используем уникальную комбинацию полей
+                    # Создаем уникальный ключ на основе времени, команд и турнира
+                    unique_key = f"{m.time_msk.isoformat()}|{m.team1}|{m.team2}|{cleaned_tournament}|{m.bo}"
                     
-                    # Проверяем, была ли вставка или обновление
-                    if cur.rowcount > 0:
-                        if cur.statusmessage and "INSERT" in cur.statusmessage:
-                            new_count += 1
-                        else:
-                            updated_count += 1
+                    try:
+                        cur.execute(
+                            """
+                            INSERT INTO dota_matches (
+                                match_time_msk,
+                                match_time_raw,
+                                team1,
+                                team2,
+                                score,
+                                bo,
+                                tournament,
+                                tournament_id,
+                                status,
+                                match_url
+                            )
+                            VALUES (
+                                %(match_time_msk)s,
+                                %(match_time_raw)s,
+                                %(team1)s,
+                                %(team2)s,
+                                %(score)s,
+                                %(bo)s,
+                                %(tournament)s,
+                                %(tournament_id)s,
+                                %(status)s,
+                                %(match_url)s
+                            )
+                            ON CONFLICT (match_time_msk, team1, team2, tournament, bo) DO UPDATE SET
+                                match_time_msk = EXCLUDED.match_time_msk,
+                                match_time_raw = EXCLUDED.match_time_raw,
+                                team1 = EXCLUDED.team1,
+                                team2 = EXCLUDED.team2,
+                                score = EXCLUDED.score,
+                                bo = EXCLUDED.bo,
+                                tournament = EXCLUDED.tournament,
+                                tournament_id = EXCLUDED.tournament_id,
+                                status = EXCLUDED.status,
+                                match_url = COALESCE(dota_matches.match_url, EXCLUDED.match_url),
+                                updated_at = now();
+                            """,
+                            {
+                                "match_time_msk": m.time_msk,
+                                "match_time_raw": m.time_raw,
+                                "team1": m.team1,
+                                "team2": m.team2,
+                                "score": m.score,
+                                "bo": bo_int,
+                                "tournament": cleaned_tournament,
+                                "tournament_id": tournament_id,
+                                "status": m.status or "unknown",
+                                "match_url": m.match_url,
+                            },
+                        )
+                        
+                        # Проверяем, была ли вставка или обновление
+                        if cur.rowcount > 0:
+                            if cur.statusmessage and "INSERT" in cur.statusmessage:
+                                new_count += 1
+                            else:
+                                updated_count += 1
+                                
+                    except psycopg.errors.UniqueViolation:
+                        # Игнорируем дубликаты - это нормально, так как матчи могут дублироваться на странице
+                        print(f"[DEBUG] Пропускаем дубликат: {m.team1} vs {m.team2} в {cleaned_tournament}")
+                        continue
         conn.commit()
 
     print(f"Сохранили/обновили {len(matches)} матчей в БД (новых: {new_count}, обновлено: {updated_count})")

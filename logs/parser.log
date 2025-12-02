@@ -3,3 +3,24 @@
 {"level": "info", "msg": "worker_once_finished", "metrics": {"total": 0, "status_counts": {"upcoming": 0, "live": 0, "finished": 0, "unknown": 0}}, "time": "2025-11-30 15:23:24"}
 {"level": "info", "msg": "tournaments synced from Main_Page", "count": 12, "time": "2025-11-30 15:28:46"}
 {"level": "info", "msg": "worker_once_finished", "metrics": {"total": 0, "status_counts": {"upcoming": 0, "live": 0, "finished": 0, "unknown": 0}}, "time": "2025-11-30 15:28:49"}
+{"level": "info", "msg": "tournaments synced from Main_Page", "count": 12, "time": "2025-11-30 23:55:07"}
+{"level": "info", "msg": "worker_once_finished", "metrics": {"total": 0, "status_counts": {"upcoming": 0, "live": 0, "finished": 0, "unknown": 0}}, "time": "2025-11-30 23:55:10"}
+{"level": "info", "msg": "tournaments synced from Main_Page", "count": 12, "time": "2025-12-01 00:00:15"}
+{"level": "info", "msg": "worker_once_finished", "metrics": {"total": 0, "status_counts": {"upcoming": 0, "live": 0, "finished": 0, "unknown": 0}}, "time": "2025-12-01 00:00:18"}
+{"level": "info", "msg": "tournaments synced from Main_Page", "count": 12, "time": "2025-12-01 00:04:01"}
+{"level": "info", "msg": "worker_once_finished", "metrics": {"total": 0, "status_counts": {"upcoming": 0, "live": 0, "finished": 0, "unknown": 0}}, "time": "2025-12-01 00:04:04"}
+{"level": "info", "msg": "tournaments synced from Main_Page", "count": 13, "time": "2025-12-01 20:35:49"}
+{"level": "info", "msg": "worker_once_finished", "metrics": {"total": 0, "status_counts": {"upcoming": 0, "live": 0, "finished": 0, "unknown": 0}}, "time": "2025-12-01 20:35:52"}
+{"level": "info", "msg": "tournaments synced from Main_Page", "count": 13, "time": "2025-12-01 20:53:06"}
+{"level": "info", "msg": "worker_once_finished", "metrics": {"total": 0, "status_counts": {"upcoming": 0, "live": 0, "finished": 0, "unknown": 0}}, "time": "2025-12-01 20:53:10"}
+{"level": "info", "msg": "tournaments synced from Main_Page", "count": 13, "time": "2025-12-01 21:33:09"}
+{"level": "info", "msg": "worker_once_finished", "metrics": {"total": 0, "status_counts": {"upcoming": 0, "live": 0, "finished": 0, "unknown": 0}}, "time": "2025-12-01 21:33:13"}
+{"level": "info", "msg": "tournaments synced from Main_Page", "count": 13, "time": "2025-12-01 21:45:18"}
+{"level": "info", "msg": "worker_once_finished", "metrics": {"total": 0, "status_counts": {"upcoming": 0, "live": 0, "finished": 0, "unknown": 0}}, "time": "2025-12-01 21:45:21"}
+{"level": "info", "msg": "tournaments synced from Main_Page", "count": 13, "time": "2025-12-01 22:28:06"}
+{"level": "info", "msg": "tournaments synced from Main_Page", "count": 13, "time": "2025-12-01 22:30:09"}
+{"level": "info", "msg": "worker_once_finished", "metrics": {"total": 102, "status_counts": {"upcoming": 0, "live": 0, "finished": 53, "unknown": 49}}, "time": "2025-12-01 22:30:13"}
+{"level": "info", "msg": "tournaments synced from Main_Page", "count": 13, "time": "2025-12-01 22:37:25"}
+{"level": "info", "msg": "worker_once_finished", "metrics": {"total": 102, "status_counts": {"upcoming": 0, "live": 0, "finished": 53, "unknown": 49}}, "time": "2025-12-01 22:37:29"}
+{"level": "info", "msg": "tournaments synced from Main_Page", "count": 13, "time": "2025-12-01 22:45:28"}
+{"level": "info", "msg": "worker_once_finished", "metrics": {"total": 102, "status_counts": {"upcoming": 0, "live": 0, "finished": 53, "unknown": 49}}, "time": "2025-12-01 22:45:32"}

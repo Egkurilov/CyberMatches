@@ -395,10 +395,11 @@ def save_matches_to_db(matches: list[Match]) -> None:
                         else:
                             updated_count += 1
                 else:
-                    # Для матчей без liquipedia_match_id используем уникальную комбинацию полей
-                    # Создаем уникальный ключ на основе времени, команд и турнира
-                    unique_key = f"{m.time_msk.isoformat()}|{m.team1}|{m.team2}|{cleaned_tournament}|{m.bo}"
-                    
+                # Для матчей без liquipedia_match_id используем уникальную комбинацию полей
+                # Создаем уникальный ключ на основе времени, команд и турнира
+                unique_key = f"{m.time_msk.isoformat()}|{m.team1}|{m.team2}|{cleaned_tournament}|{m.bo}"
+                
+                try:
                     cur.execute(
                         """
                         INSERT INTO dota_matches (
@@ -451,6 +452,10 @@ def save_matches_to_db(matches: list[Match]) -> None:
                             "match_url": m.match_url,
                         },
                     )
+                except psycopg.errors.UniqueViolation:
+                    # Игнорируем дубликаты - это нормально, так как матчи могут дублироваться на странице
+                    print(f"[DEBUG] Пропускаем дубликат: {m.team1} vs {m.team2} в {cleaned_tournament}")
+                    continue
                     
                     # Проверяем, была ли вставка или обновление
                     if cur.rowcount > 0:

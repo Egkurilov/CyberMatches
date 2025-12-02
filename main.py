@@ -654,7 +654,7 @@ def clean_tournament_name(tournament_name: str) -> str:
     # Удаляем суффиксы вида " - Playoffs", " - November 29-A", " - Group B" и т.д.
     # Оставляем только основное название турнира
     # Улучшенное регулярное выражение для более универсальной очистки
-    cleaned = re.split(r'\s*-\s*(?:Playoffs|Group\s+[A-Z]|November\s+\d+-[A-Z]|Play-In|Playoffs|Some\s+Other\s+Stuff)', tournament_name, 1)[0]
+    cleaned = re.split(r'\s*-\s*(?:Playoffs|Group\s+[A-Z]|November\s+\d+-[A-Z]|Play-In|Playoffs|Some\s+Other\s+Stuff)', tournament_name, maxsplit=1)[0]
     
     # Удаляем лишние пробелы в начале и конце
     cleaned = cleaned.strip()

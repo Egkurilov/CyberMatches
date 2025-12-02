@@ -19,10 +19,12 @@ HEADERS = {
 }
 
 def parse_time_to_msk(time_str: str):
-    """Парсим строки вида 'November 30, 2025 - 17:15 MSK' в datetime с tzinfo=MSK."""
+    """Парсим строки вида 'November 30, 2025 - 17:15 MSK' или 'December 2, 2025 - 10:00CET' в datetime с tzinfo=MSK."""
     try:
+        # Улучшенное регулярное выражение для обработки разных форматов
+        # Поддерживает как "17:15 MSK" так и "17:15MSK"
         m = re.match(
-            r"([A-Z][a-z]+ \d{1,2}, \d{4}) - (\d{1,2}:\d{2}) ([A-Z]+)",
+            r"([A-Z][a-z]+ \d{1,2}, \d{4}) - (\d{1,2}:\d{2})\s*([A-Z]+)",
             time_str.strip(),
         )
         if not m:
@@ -38,6 +40,7 @@ def parse_time_to_msk(time_str: str):
         tz_offsets = {
             "UTC": 0, "GMT": 0, "CET": 1, "CEST": 2, "EET": 2, "EEST": 3,
             "MSK": 3, "SGT": 8, "PST": -8, "PDT": -7, "EST": -5, "EDT": -4,
+            "BST": 1,  # British Summer Time
         }
         
         offset_hours = tz_offsets.get(tz_abbr, 0)
@@ -46,7 +49,7 @@ def parse_time_to_msk(time_str: str):
         msk_tz = timezone(timedelta(hours=3))
         return src_dt.astimezone(msk_tz)
     except Exception as e:
-        print(f"Ошибка парсинга времени: {e}")
+        print(f"Ошибка парсинга времени '{time_str}': {e}")
         return None
 
 def extract_score_from_container(container):
@@ -109,15 +112,23 @@ def extract_tournament_from_container(container):
     """
     Извлекает название турнира из контейнера
     """
+    # Ищем в нескольких возможных местах
     tournament_elem = container.find('div', class_='match-info-tournament')
-    if not tournament_elem:
-        return None
+    if tournament_elem:
+        # Получаем весь текст из элемента, включая вложенные span
+        tournament_text = tournament_elem.get_text(strip=True)
+        if tournament_text:
+            return tournament_text
     
-    tournament_link = tournament_elem.find('a')
-    if tournament_link:
-        return tournament_link.get_text(strip=True)
+    # Пробуем найти в других местах
+    # Ищем ссылки на турниры (исключаем ссылки на команды и матчи)
+    tournament_links = container.find_all('a', href=lambda x: x and ('/dota2/' in x and 'Match:' not in x and not any(team in x.lower() for team in ['team', 'gaming', 'academy', 'junior'])))
+    for link in tournament_links:
+        text = link.get_text(strip=True)
+        if text and len(text) > 10 and any(keyword in text.lower() for keyword in ['season', 'series', 'league', 'cup', 'championship', 'tournament']):
+            return text
     
-    return tournament_elem.get_text(strip=True)
+    return None
 
 def extract_match_url_from_container(container):
     """

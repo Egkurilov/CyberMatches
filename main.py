@@ -379,7 +379,7 @@ def save_matches_to_db(matches: list[Match]) -> None:
                             "team1": m.team1,
                             "team2": m.team2,
                             "score": m.score,
-                            "bo": m.bo,
+                            "bo": bo_int,
                             "tournament": cleaned_tournament,
                             "tournament_id": tournament_id,
                             "status": m.status or "unknown",

@@ -55,13 +55,12 @@ def fix_database_constraints():
                     END $$;
                 """)
                 
-                # Добавляем уникальный constraint для liquipedia_match_id
+                # Добавляем уникальный constraint для liquipedia_match_id (обычный unique)
                 print("Добавляем уникальный constraint для liquipedia_match_id...")
                 cur.execute("""
                     ALTER TABLE dota_matches 
                     ADD CONSTRAINT dota_matches_liquipedia_match_id_unique 
-                    UNIQUE (liquipedia_match_id) 
-                    WHERE liquipedia_match_id IS NOT NULL AND liquipedia_match_id != '';
+                    UNIQUE (liquipedia_match_id);
                 """)
                 
                 # Добавляем уникальный constraint для комбинации полей

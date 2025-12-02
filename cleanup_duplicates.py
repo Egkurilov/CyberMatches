@@ -1,176 +1,113 @@
-import os
-from dataclasses import dataclass
-from typing import Optional, List, Dict
+#!/usr/bin/env python3
+"""
+Скрипт для очистки дубликатов в базе данных перед добавлением constraints
+"""
 
-from dotenv import load_dotenv
 import psycopg
+import os
+from dotenv import load_dotenv
 
+# Загружаем переменные окружения
+load_dotenv()
 
-@dataclass
-class MatchRow:
-    id: int
-    match_uid: str
-    score: Optional[str]
-    match_url: Optional[str]
-    status: Optional[str]
-    updated_at: Optional[str]
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = int(os.getenv("DB_PORT", "5432"))
+DB_NAME = os.getenv("DB_NAME", "postgres")
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 
-
-def calc_score(row: MatchRow) -> int:
-    """
-    Оцениваем «полезность» записи:
-    +2 за наличие score
-    +1 за наличие match_url
-    +1 если status = 'finished'
-    """
-    points = 0
-    if row.score:
-        points += 2
-    if row.match_url:
-        points += 1
-    if row.status == "finished":
-        points += 1
-    return points
-
-
-def choose_best(rows: List[MatchRow]) -> MatchRow:
-    """
-    Выбираем лучшую запись из группы одного match_uid:
-    1) по calc_score
-    2) по updated_at (новее лучше)
-    3) по id (больше лучше)
-    """
-    def sort_key(r: MatchRow):
-        return (
-            calc_score(r),
-            r.updated_at or "",
-            r.id,
-        )
-
-    # max по ключу — лучший
-    best = max(rows, key=sort_key)
-    return best
-
-
-def main():
-    load_dotenv()
-
-    DB_HOST = os.getenv("DB_HOST")
-    DB_PORT = os.getenv("DB_PORT")
-    DB_NAME = os.getenv("DB_NAME")
-    DB_USER = os.getenv("DB_USER")
-    DB_PASSWORD = os.getenv("DB_PASSWORD")
-
-    if not all([DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD]):
-        print("❌ Не хватает параметров в .env")
-        print("DB_HOST:", DB_HOST)
-        print("DB_PORT:", DB_PORT)
-        print("DB_NAME:", DB_NAME)
-        print("DB_USER:", DB_USER)
-        print("DB_PASSWORD:", "SET" if DB_PASSWORD else "EMPTY")
-        return
-
-    conn_str = (
-        f"host={DB_HOST} "
-        f"port={DB_PORT} "
-        f"dbname={DB_NAME} "
-        f"user={DB_USER} "
-        f"password={DB_PASSWORD}"
-    )
-
-    print("Подключаемся к базе...")
-    with psycopg.connect(conn_str) as conn:
-        with conn.cursor() as cur:
-            # 1) Находим все match_uid, у которых больше одной записи
-            cur.execute("""
-                SELECT match_uid, COUNT(*) AS cnt
-                FROM dota_matches
-                GROUP BY match_uid
-                HAVING COUNT(*) > 1;
-            """)
-            dup_uids = cur.fetchall()
-
-            if not dup_uids:
-                print("✅ Дубли по match_uid не найдены. Чистить нечего.")
-                return
-
-            print(f"Найдено групп-дублей: {len(dup_uids)}")
-
-            uid_list = [row[0] for row in dup_uids]
-
-            # 2) Подтягиваем все строки по этим match_uid
-            cur.execute("""
-                SELECT
-                    id,
-                    match_uid,
-                    score,
-                    match_url,
-                    status,
-                    updated_at
-                FROM dota_matches
-                WHERE match_uid = ANY(%s)
-                ORDER BY match_uid, id;
-            """, (uid_list,))
-
-            rows = cur.fetchall()
-
-            groups: Dict[str, List[MatchRow]] = {}
-            for r in rows:
-                row = MatchRow(
-                    id=r[0],
-                    match_uid=r[1],
-                    score=r[2],
-                    match_url=r[3],
-                    status=r[4],
-                    updated_at=(r[5].isoformat() if r[5] is not None else None),
-                )
-                groups.setdefault(row.match_uid, []).append(row)
-
-            total_to_delete = 0
-            to_delete_ids: List[int] = []
-
-            print()
-            print("Подготовка к удалению дублей...")
-            print("--------------------------------")
-
-            for uid, gr in groups.items():
-                if len(gr) <= 1:
-                    continue
-
-                best = choose_best(gr)
-                losers = [r for r in gr if r.id != best.id]
-
-                print(f"match_uid = {uid}")
-                print(f"  оставляем id={best.id} (score={best.score!r}, url={best.match_url!r}, status={best.status})")
-                if losers:
-                    print("  удаляем:")
-                    for l in losers:
-                        print(f"    id={l.id} (score={l.score!r}, url={l.match_url!r}, status={l.status})")
-                        to_delete_ids.append(l.id)
-                print()
-
-            total_to_delete = len(to_delete_ids)
-            if total_to_delete == 0:
-                print("✅ Формально дубликаты есть, но выбирать лучшее не пришлось (что-то пошло не так логически).")
-                return
-
-            print("--------------------------------")
-            print(f"ИТОГО к удалению: {total_to_delete} записей.")
-            confirm = input("Удалить эти записи? Напиши 'yes' для подтверждения: ").strip().lower()
-            if confirm != "yes":
-                print("Отменено пользователем. Ничего не удалено.")
-                return
-
-            # 3) Удаляем
-            cur.execute(
-                "DELETE FROM dota_matches WHERE id = ANY(%s);",
-                (to_delete_ids,),
-            )
-
-        conn.commit()
-
-    print(f"🧹 Готово, удалено записей: {total_to_delete}")
-
+def cleanup_duplicates():
+    """Очищаем дубликаты в базе данных"""
+    print("🧹 Очищаем дубликаты в базе данных...")
+    
+    try:
+        with psycopg.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
+        ) as conn:
+            with conn.cursor() as cur:
+                print("Поиск дубликатов по комбинации полей...")
+                
+                # Находим дубликаты
+                cur.execute("""
+                    SELECT match_time_msk, team1, team2, tournament, bo, COUNT(*) as cnt
+                    FROM dota_matches
+                    WHERE match_time_msk IS NOT NULL 
+                      AND team1 IS NOT NULL 
+                      AND team2 IS NOT NULL
+                    GROUP BY match_time_msk, team1, team2, tournament, bo
+                    HAVING COUNT(*) > 1
+                    ORDER BY cnt DESC;
+                """)
+                
+                duplicates = cur.fetchall()
+                print(f"Найдено групп с дубликатами: {len(duplicates)}")
+                
+                if duplicates:
+                    print("Удаляем дубликаты, оставляя только первую запись в каждой группе...")
+                    
+                    # Удаляем дубликаты, оставляя только одну запись в каждой группе
+                    cur.execute("""
+                        DELETE FROM dota_matches a
+                        USING dota_matches b
+                        WHERE a.id > b.id
+                          AND a.match_time_msk = b.match_time_msk
+                          AND a.team1 = b.team1
+                          AND a.team2 = b.team2
+                          AND a.tournament = b.tournament
+                          AND a.bo = b.bo;
+                    """)
+                    
+                    deleted_count = cur.rowcount
+                    print(f"Удалено дубликатов: {deleted_count}")
+                
+                # Проверяем дубликаты по liquipedia_match_id
+                print("Поиск дубликатов по liquipedia_match_id...")
+                cur.execute("""
+                    SELECT liquipedia_match_id, COUNT(*) as cnt
+                    FROM dota_matches
+                    WHERE liquipedia_match_id IS NOT NULL 
+                      AND liquipedia_match_id != ''
+                    GROUP BY liquipedia_match_id
+                    HAVING COUNT(*) > 1
+                    ORDER BY cnt DESC;
+                """)
+                
+                liquipedia_duplicates = cur.fetchall()
+                print(f"Найдено дубликатов по liquipedia_match_id: {len(liquipedia_duplicates)}")
+                
+                if liquipedia_duplicates:
+                    print("Удаляем дубликаты по liquipedia_match_id...")
+                    
+                    # Удаляем дубликаты, оставляя только одну запись с наибольшим ID
+                    cur.execute("""
+                        DELETE FROM dota_matches a
+                        USING dota_matches b
+                        WHERE a.id < b.id
+                          AND a.liquipedia_match_id = b.liquipedia_match_id;
+                    """)
+                    
+                    deleted_liquipedia = cur.rowcount
+                    print(f"Удалено дубликатов по liquipedia_match_id: {deleted_liquipedia}")
+                
+                conn.commit()
+                print("✅ Дубликаты успешно удалены!")
+                
+                # Показываем статистику после очистки
+                cur.execute("SELECT COUNT(*) FROM dota_matches;")
+                total_matches = cur.fetchone()[0]
+                print(f"Общее количество матчей после очистки: {total_matches}")
+                
+    except Exception as e:
+        print(f"❌ Ошибка при очистке дубликатов: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+    
+    return True
 
 if __name__ == "__main__":
-    main()
+    cleanup_duplicates()

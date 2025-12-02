@@ -149,9 +149,7 @@ class AsyncDatabasePool:
         if not self._initialized:
             self._pool = await AsyncConnection.connect(
                 self.conn_str,
-                autocommit=True,
-                min_size=2,
-                max_size=10
+                autocommit=True
             )
             self._initialized = True
             logger.info("Асинхронный пул подключений к БД инициализирован")
@@ -439,8 +437,8 @@ def format_match(match: Match) -> str:
 
 
 def format_matches_grouped(matches: List[Match], day: date) -> str:
-    """Группировка матчей (без изменений)"""
-    header = f"📅 Матчи на {day.isoformat()} (МСК)\n"
+    """Группировка матчей в одно компактное сообщение"""
+    header = f"📅 <b>Матчи на {day.strftime('%d.%m.%Y')} (МСК)</b>\n"
 
     if not matches:
         return header + "\nНа этот день матчей не найдено 🤷‍♂️"
@@ -470,19 +468,55 @@ def format_matches_grouped(matches: List[Match], day: date) -> str:
     parts: List[str] = []
 
     if live:
-        parts.append("🟢 LIVE\n\n" + "\n\n".join(format_match(m) for m in live))
+        parts.append("🟢 <b>LIVE</b>\n" + "\n".join(format_match_compact(m) for m in live))
 
     if upcoming:
-        parts.append("⏰ Скоро начнутся\n\n" + "\n\n".join(format_match(m) for m in upcoming))
+        parts.append("⏰ <b>Скоро начнутся</b>\n" + "\n".join(format_match_compact(m) for m in upcoming))
 
     if finished:
-        parts.append("✅ Завершённые\n\n" + "\n\n".join(format_match(m) for m in finished))
+        parts.append("✅ <b>Завершённые</b>\n" + "\n".join(format_match_compact(m) for m in finished))
 
     if other:
-        parts.append("❓ Прочие\n\n" + "\n\n".join(format_match(m) for m in other))
+        parts.append("❓ <b>Прочие</b>\n" + "\n".join(format_match_compact(m) for m in other))
 
-    body = "\n\n────────────\n\n".join(parts)
-    return header + "\n" + body
+    # Добавляем статистику
+    total_matches = len(matches)
+    live_count = len(live)
+    upcoming_count = len(upcoming)
+    finished_count = len(finished)
+    
+    stats = f"\n📊 <i>Всего матчей: {total_matches} (LIVE: {live_count}, скоро: {upcoming_count}, завершено: {finished_count})</i>"
+    
+    # Добавляем время последнего обновления
+    update_time = datetime.now(MSK_TZ).strftime("%H:%M")
+    footer = f"\n\n🔄 <i>Обновлено в {update_time}</i>"
+    
+    body = "\n\n".join(parts)
+    return header + "\n" + body + stats + footer
+
+
+def format_match_compact(match: Match) -> str:
+    """Компактное форматирование одного матча для единого сообщения"""
+    status = (match.status or "").lower()
+
+    if status == "upcoming":
+        status_emoji = "⏰"
+    elif status == "live":
+        status_emoji = "🟢"
+    elif status == "finished":
+        status_emoji = "✅"
+    else:
+        status_emoji = "❓"
+
+    time_line = (
+        match.time_msk
+        or match.match_time_msk.astimezone(MSK_TZ).strftime("%H:%M")
+    )
+
+    score_line = f" | {match.score}" if match.score else ""
+
+    # Компактный формат: время команды формат счет
+    return f"  {status_emoji} <b>{time_line}</b> {match.team1} vs {match.team2} (Bo{match.bo}){score_line}"
 
 
 def build_tournaments_keyboard(matches: List[Match], excluded: Set[str]) -> Optional[InlineKeyboardMarkup]:

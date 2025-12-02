@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 import re
 from datetime import datetime, timedelta, timezone
+from typing import List, Dict, Optional
 
 URL = "https://liquipedia.net/dota2/Liquipedia:Matches"
 HEADERS = {
@@ -147,7 +148,7 @@ def is_match_finished(container):
     """
     return bool(container.find(['div', 'span'], class_=['match-info-header-winner', 'match-info-header-loser']))
 
-def parse_matches_from_html(html: str) -> list[dict]:
+def parse_matches_from_html(html: str) -> List[Dict]:
     """
     Основная функция парсинга матчей из HTML
     """

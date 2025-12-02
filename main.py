@@ -315,23 +315,23 @@ def save_matches_to_db(matches: list[Match]) -> None:
                 # Новая система идентификации на основе liquipedia_match_id
                 liquipedia_match_id = build_match_identifier(m)
                 
+                # Получаем tournament_id из новой таблицы tournaments для всех случаев
+                tournament_id = None
+                if cleaned_tournament:
+                    cur.execute(
+                        """
+                        SELECT id FROM tournaments 
+                        WHERE name = %s 
+                        LIMIT 1;
+                        """,
+                        (cleaned_tournament,)
+                    )
+                    result = cur.fetchone()
+                    if result:
+                        tournament_id = result[0]
+                
                 # Если есть liquipedia_match_id - используем его для upsert
                 if liquipedia_match_id:
-                    # Получаем tournament_id из новой таблицы tournaments
-                    tournament_id = None
-                    if cleaned_tournament:
-                        cur.execute(
-                            """
-                            SELECT id FROM tournaments 
-                            WHERE name = %s 
-                            LIMIT 1;
-                            """,
-                            (cleaned_tournament,)
-                        )
-                        result = cur.fetchone()
-                        if result:
-                            tournament_id = result[0]
-
                     cur.execute(
                         """
                         INSERT INTO dota_matches (

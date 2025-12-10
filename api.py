@@ -122,6 +122,27 @@ class DatabasePool:
 # Создание глобального экземпляра пула
 db_pool = DatabasePool()
 
+# Синхронное соединение для вспомогательных запросов (например, получения URL команды)
+conn_sync: psycopg.Connection | None = None
+
+def get_sync_connection() -> psycopg.Connection:
+    """
+    Ленивая инициализация синхронного соединения с БД.
+    Если соединение отсутствует или закрыто — создаём новое.
+    Используется для вспомогательных запросов, где удобно работать через sync-API psycopg.
+    """
+    global conn_sync
+    if conn_sync is None or getattr(conn_sync, "closed", False):
+        conn_sync = psycopg.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
+        )
+    return conn_sync
+
+
 # ---------- Кэширование и оптимизация ----------
 
 @lru_cache(maxsize=128)
@@ -227,9 +248,9 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
             "match_time_msk": match_time_msk.isoformat(),
             "time_msk": match_time_msk.strftime("%H:%M"),
             "team1": team1,
-            "team1_url": get_team_url(conn_sync, row["team1"]),
+            "team1_url": get_team_url(get_sync_connection(), team1),
             "team2": team2,
-            "team2_url": get_team_url(conn_sync, row["team2"]),
+            "team2_url": get_team_url(get_sync_connection(), team2),
             "bo": bo_int,
             "tournament": tournament or "",
             "status": status or "unknown",
@@ -368,9 +389,9 @@ async def get_matches_with_tournament_filter(
         match_dict = {
             "match_id": match_id,
             "team1": team1,
-            "team1_url": get_team_url(conn_sync, team1),
+            "team1_url": get_team_url(get_sync_connection(), team1),
             "team2": team2,
-            "team2_url": get_team_url(conn_sync, team2),
+            "team2_url": get_team_url(get_sync_connection(), team2),
             "bo": bo_int,
             "tournament": tournament or "",
             "status": status or "unknown",
@@ -414,10 +435,6 @@ async def get_matches_with_tournament_filter(
 
 
 def get_team_url(conn, team_name: str) -> str | None:
-    """
-    Возвращает Liquipedia URL команды по названию (как оно распарсено в матчах).
-    Если команда не найдена в dota_teams — возвращает None.
-    """
     if not team_name:
         return None
 
@@ -429,10 +446,11 @@ def get_team_url(conn, team_name: str) -> str | None:
             WHERE LOWER(name) = LOWER(%s)
             LIMIT 1;
             """,
-            (team_name,)
+            (team_name,),
         )
         row = cur.fetchone()
         return row[0] if row else None
+
 
 
 # ---------- FastAPI-приложение с улучшениями ----------
@@ -600,6 +618,8 @@ async def health_check():
             "error": str(e),
             "timestamp": datetime.now().isoformat(),
         }
+
+
 
 if __name__ == "__main__":
     import uvicorn

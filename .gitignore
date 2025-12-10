@@ -1,4 +1,5 @@
 # created by virtualenv automatically
 .venv/
 temp/
-.env
+.env.env # если ещё нет
+git commit -m "Remove .env from repo and ignore it"

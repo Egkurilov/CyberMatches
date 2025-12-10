@@ -222,11 +222,14 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
         # вытаскиваем Liquipedia ID из БД / match_uid / match_url
         liquipedia_id = liqui_in_db or extract_liquipedia_id(match_uid, match_url)
 
+
         match_dict: Dict[str, Any] = {
             "match_time_msk": match_time_msk.isoformat(),
             "time_msk": match_time_msk.strftime("%H:%M"),
             "team1": team1,
+            "team1_url": get_team_url(conn_sync, row["team1"]),
             "team2": team2,
+            "team2_url": get_team_url(conn_sync, row["team2"]),
             "bo": bo_int,
             "tournament": tournament or "",
             "status": status or "unknown",
@@ -363,10 +366,11 @@ async def get_matches_with_tournament_filter(
         liquipedia_id = liqui_in_db or extract_liquipedia_id(match_uid, match_url)
 
         match_dict = {
-            "match_time_msk": match_time_msk.isoformat(),
-            "time_msk": match_time_msk.strftime("%H:%M"),
+            "match_id": match_id,
             "team1": team1,
+            "team1_url": get_team_url(conn_sync, team1),
             "team2": team2,
+            "team2_url": get_team_url(conn_sync, team2),
             "bo": bo_int,
             "tournament": tournament or "",
             "status": status or "unknown",
@@ -409,26 +413,51 @@ async def get_matches_with_tournament_filter(
     return list(matches_by_key.values())
 
 
+def get_team_url(conn, team_name: str) -> str | None:
+    """
+    Возвращает Liquipedia URL команды по названию (как оно распарсено в матчах).
+    Если команда не найдена в dota_teams — возвращает None.
+    """
+    if not team_name:
+        return None
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT liquipedia_url
+            FROM dota_teams
+            WHERE LOWER(name) = LOWER(%s)
+            LIMIT 1;
+            """,
+            (team_name,)
+        )
+        row = cur.fetchone()
+        return row[0] if row else None
+
+
 # ---------- FastAPI-приложение с улучшениями ----------
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Управление жизненным циклом приложения (startup/shutdown)."""
+    # startup
+    logging.info("Startup: инициализация пула подключений к БД")
+    await db_pool.init_pool()
+
+    yield  # <-- здесь приложение работает
+
+    # shutdown
+    logging.info("Shutdown: закрытие пула подключений к БД")
+    await db_pool.close_pool()
+
 
 app = FastAPI(
     title="CyberMatches API",
     description="Оптимизированный API для матчей Dota 2 из Liquipedia",
     version="2.0.0",
+    lifespan=lifespan,
 )
 
-# Жизненный цикл приложения
-@app.on_event("startup")
-async def startup_event():
-    """Инициализация при старте приложения"""
-    await db_pool.init_pool()
-    logger.info("CyberMatches API запущен")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Очистка при остановке приложения"""
-    await db_pool.close_pool()
-    logger.info("CyberMatches API остановлен")
 
 @app.get("/dota/matches/today")
 async def matches_today():
@@ -571,3 +600,13 @@ async def health_check():
             "error": str(e),
             "timestamp": datetime.now().isoformat(),
         }
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "api:app",
+        host="0.0.0.0",
+        port=int(os.getenv("API_PORT", 8050)),
+        reload=False,
+    )

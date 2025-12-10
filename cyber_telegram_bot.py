@@ -845,6 +845,7 @@ async def poll_matches(bot: Bot) -> None:
                         text=new_text,
                         parse_mode="HTML",
                         reply_markup=keyboard,
+                        disable_web_page_preview=True,
                     )
                     logger.info(
                         "Поллер: обновили today-сообщение в чате %s (message_id=%s, day=%s)",
@@ -1137,6 +1138,7 @@ async def cmd_today(message: Message):
         text,
         parse_mode="HTML",
         reply_markup=keyboard,
+        disable_web_page_preview=True,  # 👈 вот эта строка прячет фиолетовый превью-блок
     )
     state.chat_id = sent.chat.id
     state.message_id = sent.message_id
@@ -1437,6 +1439,7 @@ async def daily_notifier(bot: Bot) -> None:
                             text=text,
                             parse_mode="HTML",
                             reply_markup=keyboard,
+                            disable_web_page_preview=True,
                         )
                         logger.info(
                             "Ежедневное уведомление: обновили today-сообщение в чате %s (message_id=%s, day=%s)",
@@ -1450,6 +1453,7 @@ async def daily_notifier(bot: Bot) -> None:
                             text=text,
                             parse_mode="HTML",
                             reply_markup=keyboard,
+                            disable_web_page_preview=True,
                         )
                         state.chat_id = sent.chat.id
                         state.message_id = sent.message_id

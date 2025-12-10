@@ -106,7 +106,7 @@ TZ_OFFSETS = {
     "UTC": 0,
     "GMT": 0,
     "PET": -5,
-
+    "GST": 4,  # Gulf Standard Time (Asia/Dubai), UTC+4
 }
 
 TZ_OFFSETS_MINUTES: dict[str, int] = {
@@ -166,6 +166,33 @@ KNOWN_TOURNAMENTS_BY_NAME: Dict[str, Tournament] = {}
 # ---------------------------------------------------------------------------
 # УТИЛИТЫ
 # ---------------------------------------------------------------------------
+def _strip_page_does_not_exist(name: str) -> str:
+    """
+    Убираем суффикс ' (page does not exist)' в конце строки, если он есть.
+    """
+    if not name:
+        return ""
+    # режем только в конце, чтобы не сносить похожие по смыслу части в середине
+    return re.sub(r"\s*\(page does not exist\)\s*$", "", name).strip()
+
+
+def extract_team_name_from_tag(tag: Tag) -> str:
+    """
+    Берём нормальное имя команды:
+    - сначала из title, но без ' (page does not exist)'
+    - если нет title — из текста ссылки, тоже без суффикса
+    """
+    if not tag:
+        return ""
+
+    title = tag.get("title")
+    if title:
+        clean = _strip_page_does_not_exist(title)
+        if clean:
+            return clean
+
+    text = tag.get_text(strip=True)
+    return _strip_page_does_not_exist(text)
 
 def fetch_html(url: str) -> str:
     resp = requests.get(url, headers=HEADERS, timeout=15)
@@ -741,17 +768,18 @@ def parse_matches_from_html(html: str) -> List[Match]:
                 # более терпимый парсер (умеет жить с <abbr> и прочим)
                 time_msk = parse_time_to_msk(time_raw)
 
+
         # --- Команды ---
         teams = container.select(
             ".team-template-text a, .team-template-image-icon + span.name a"
         )
         team1 = (
-            normalize_team_name(teams[0].get_text(strip=True))
+            normalize_team_name(extract_team_name_from_tag(teams[0]))
             if len(teams) >= 1
             else None
         )
         team2 = (
-            normalize_team_name(teams[1].get_text(strip=True))
+            normalize_team_name(extract_team_name_from_tag(teams[1]))
             if len(teams) >= 2
             else None
         )
@@ -1226,10 +1254,13 @@ def _save_matches_to_db_impl(matches: List[Match]) -> None:
                         score          = COALESCE(EXCLUDED.score, dota_matches.score),
                         bo             = COALESCE(EXCLUDED.bo, dota_matches.bo),
                         match_time_raw = COALESCE(EXCLUDED.match_time_raw, dota_matches.match_time_raw),
+                        team1          = COALESCE(EXCLUDED.team1, dota_matches.team1),
+                        team2          = COALESCE(EXCLUDED.team2, dota_matches.team2),
+                        tournament     = COALESCE(EXCLUDED.tournament, dota_matches.tournament),
                         status         = COALESCE(EXCLUDED.status, dota_matches.status),
                         match_url      = COALESCE(EXCLUDED.match_url, dota_matches.match_url),
                         updated_at     = now();
-                    """,
+                                        """,
                     {
                         "match_time_msk": m.time_msk,
                         "match_time_raw": m.time_raw,
@@ -1335,8 +1366,16 @@ def fetch_score_from_main_completed(team1: str, team2: str, tournament_clean: st
         teams = c.select(
             ".team-template-text a, .team-template-image-icon + span.name a"
         )
-        t1 = teams[0].get_text(strip=True).lower() if len(teams) >= 1 else ""
-        t2 = teams[1].get_text(strip=True).lower() if len(teams) >= 2 else ""
+        t1 = (
+            normalize_team_name(extract_team_name_from_tag(teams[0])).lower()
+            if len(teams) >= 1
+            else ""
+        )
+        t2 = (
+            normalize_team_name(extract_team_name_from_tag(teams[1])).lower()
+            if len(teams) >= 2
+            else ""
+        )
 
         if not (t1 == team1_norm and t2 == team2_norm):
             continue

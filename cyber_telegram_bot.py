@@ -101,7 +101,11 @@ class Match:
     tournament: str
     status: str
     score: Optional[str]
+    # новые поля с URL команд (если приходят из API)
+    team1_url: Optional[str] = None
+    team2_url: Optional[str] = None
     liquipedia_match_id: Optional[str] = None
+
 
 
 @dataclass
@@ -564,7 +568,9 @@ async def fetch_matches_for_day(day: date) -> List[Match]:
 
         for raw in matches_raw:
             match_time_iso = raw.get("match_time_msk")
+
             if not match_time_iso:
+                # если нет поля времени, пропускаем матч
                 continue
 
             try:
@@ -584,9 +590,13 @@ async def fetch_matches_for_day(day: date) -> List[Match]:
                     tournament=fix_encoding(raw.get("tournament", "")) or "",
                     status=raw.get("status", ""),
                     score=raw.get("score"),
+                    # 👉 прокидываем URL’ы команд из JSON
+                    team1_url=raw.get("team1_url"),
+                    team2_url=raw.get("team2_url"),
                     liquipedia_match_id=raw.get("liquipedia_match_id"),
                 )
             )
+
 
         result = deduplicate_matches(result)
 
@@ -615,17 +625,33 @@ async def fetch_matches_for_day(day: date) -> List[Match]:
 
 def _format_match_line(m: Match, group: str) -> str:
     """
-    ⏰ 15:00 AVULUS vs Passion (Bo3) [CCT S2 Series 6] 1:0
+    Пример:
+    ⏰ 15:00 <a href="...">AVULUS</a> vs <a href="...">Passion</a> (Bo3) [CCT S2 Series 6] 1:0
     """
     time_part = m.time_msk or m.match_time_msk.strftime("%H:%M")
-    parts = [f"⏰ {time_part}", f"{m.team1} vs {m.team2}"]
+
+    # Если есть URL — делаем кликабельное имя
+    if m.team1_url:
+        team1 = f'<a href="{m.team1_url}">{m.team1}</a>'
+    else:
+        team1 = m.team1
+
+    if m.team2_url:
+        team2 = f'<a href="{m.team2_url}">{m.team2}</a>'
+    else:
+        team2 = m.team2
+
+    parts = [f"⏰ {time_part}", f"{team1} vs {team2}"]
+
     if m.bo:
         parts.append(f"(Bo{m.bo})")
     if m.tournament:
         parts.append(f"[{m.tournament}]")
     if m.score and group in ("live", "finished"):
         parts.append(m.score)
+
     return " ".join(parts)
+
 
 
 def build_core_text(matches: List[Match], day: date) -> str:

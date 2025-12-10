@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timedelta, timezone, date
 from typing import List, Optional, Dict, Any
 from functools import lru_cache
-
+import re
 from dotenv import load_dotenv
 import psycopg
 from psycopg import AsyncConnection
@@ -37,10 +37,9 @@ if not all([DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD]):
     raise RuntimeError("Не хватает параметров подключения к БД в .env")
 
 # ---------- Пул подключений к БД ----------
-
 class DatabasePool:
-    """Асинхронный пул подключений к PostgreSQL"""
-    
+    """Асинхронный пул (по факту один коннект) к PostgreSQL"""
+
     def __init__(self):
         self.conn_str = (
             f"host={DB_HOST} "
@@ -49,35 +48,76 @@ class DatabasePool:
             f"user={DB_USER} "
             f"password={DB_PASSWORD}"
         )
-        self._pool = None
-    
+        self._pool: Optional[AsyncConnection] = None
+
+    async def _create_connection(self) -> AsyncConnection:
+        """Создаёт новое соединение с БД"""
+        conn = await AsyncConnection.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            autocommit=True,
+        )
+        return conn
+
+    async def _ensure_connection(self):
+        """
+        Гарантирует, что у нас есть живое соединение.
+        Если коннект отсутствует или закрыт — создаём новый.
+        """
+        # psycopg3: .closed -> True/False (или 0/1)
+        if self._pool is None or getattr(self._pool, "closed", False):
+            if self._pool is not None:
+                try:
+                    await self._pool.close()
+                except Exception:
+                    # если оно уже мёртвое — ну и ладно
+                    pass
+
+            logger.warning("Соединение с БД отсутствует или закрыто, пробуем переподключиться...")
+            self._pool = await self._create_connection()
+            logger.info("Соединение с БД установлено")
+
     async def init_pool(self):
         """Инициализация пула подключений"""
-        if not self._pool:
-            self._pool = await AsyncConnection.connect(
-                host=DB_HOST,
-                port=DB_PORT,
-                dbname=DB_NAME,
-                user=DB_USER,
-                password=DB_PASSWORD,
-                autocommit=True
-            )
-            logger.info("Пул подключений к БД инициализирован")
-    
+        await self._ensure_connection()
+
     @asynccontextmanager
     async def get_connection(self):
-        """Контекстный менеджер для получения соединения из пула"""
-        if not self._pool:
-            await self.init_pool()
-        
-        async with self._pool.cursor() as cur:
-            yield cur
-    
+        """
+        Контекстный менеджер для получения курсора.
+        При каждом вызове проверяем, что коннект жив.
+        """
+        await self._ensure_connection()
+
+        try:
+            async with self._pool.cursor() as cur:
+                yield cur
+        except (psycopg.OperationalError, psycopg.InterfaceError) as e:
+            # Типичная история: "the connection is closed", "server closed the connection" и т.п.
+            logger.error(f"Ошибка работы с БД (соединение будет пересоздано): {e}")
+            try:
+                if self._pool and not getattr(self._pool, "closed", False):
+                    await self._pool.close()
+            except Exception:
+                pass
+
+            # помечаем текущее соединение как сломанное — следующее обращение создаст новое
+            self._pool = None
+            # Пробрасываем исключение наверх — конкретный запрос всё равно не удался,
+            # но следующий уже будет на свежем соединении
+            raise
+
     async def close_pool(self):
         """Закрытие пула подключений"""
         if self._pool:
-            await self._pool.close()
-            logger.info("Пул подключений к БД закрыт")
+            try:
+                await self._pool.close()
+            finally:
+                logger.info("Пул подключений к БД закрыт")
+
 
 # Создание глобального экземпляра пула
 db_pool = DatabasePool()
@@ -91,18 +131,50 @@ def _get_timezone_msk() -> timezone:
 
 @lru_cache(maxsize=32)
 def _format_date_cache(date_str: str) -> date:
-    """Кэширование форматирования дат"""
+    """Кэшированное преобразование строки даты в объект date"""
     return datetime.strptime(date_str, "%d-%m-%Y").date()
+
+
+def extract_liquipedia_id(match_uid: Optional[str], match_url: Optional[str]) -> Optional[str]:
+    """
+    Пытаемся вытащить Liquipedia Match:ID из:
+      1) match_uid формата 'lp:ID_xxx'
+      2) match_url, где есть 'Match:ID_...'
+    """
+    if not match_uid and not match_url:
+        return None
+
+    # вариант 1: новый формат match_uid = "lp:ID_..."
+    if match_uid and match_uid.startswith("lp:"):
+        return match_uid[3:]
+
+    # вариант 2: достаём прямо из URL
+    if match_url:
+        m1 = re.search(r"Match:(ID_[^&#/?]+)", match_url)
+        if m1:
+            return m1.group(1)
+        m2 = re.search(r"(ID_[A-Za-z0-9]+(?:_[0-9]+)?)", match_url)
+        if m2:
+            return m2.group(1)
+
+    return None
+
 
 # ---------- Бизнес-логика ----------
 
 async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
     """
     Асинхронно получает список матчей на указанную дату (по МСК).
-    Использует пул подключений и оптимизированные запросы.
+
+    Делает:
+      - вытаскивание liquipedia_match_id из match_uid / match_url при необходимости;
+      - дедупликацию матчей (по Liquipedia ID или fallback-ключу);
+      - фильтрацию мусорных TBD-плейсхолдеров:
+          если в том же турнире и в то же время есть матч с нормальными командами,
+          то TBD-версия скрывается.
     """
     tz_msk = _get_timezone_msk()
-    
+
     async with db_pool.get_connection() as cur:
         await cur.execute(
             """
@@ -114,7 +186,9 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
                 tournament,
                 status,
                 score,
-                liquipedia_match_id
+                liquipedia_match_id,
+                match_uid,
+                match_url
             FROM dota_matches 
             WHERE (match_time_msk AT TIME ZONE 'Europe/Moscow')::date = %s
             ORDER BY match_time_msk;
@@ -123,17 +197,32 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
         )
         rows = await cur.fetchall()
 
-    matches = []
-    for row in rows:
-        match_time_msk, team1, team2, bo_int, tournament, status, score, liquipedia_match_id = row
+    matches_by_key: Dict[Any, Dict[str, Any]] = {}
 
-        # Приводим к МСК
+    for row in rows:
+        (
+            match_time_msk,
+            team1,
+            team2,
+            bo_int,
+            tournament,
+            status,
+            score,
+            liqui_in_db,
+            match_uid,
+            match_url,
+        ) = row
+
+        # приводим время к МСК и к таймзоне
         if match_time_msk.tzinfo is None:
             match_time_msk = match_time_msk.replace(tzinfo=timezone.utc).astimezone(tz_msk)
         else:
             match_time_msk = match_time_msk.astimezone(tz_msk)
 
-        matches.append({
+        # вытаскиваем Liquipedia ID из БД / match_uid / match_url
+        liquipedia_id = liqui_in_db or extract_liquipedia_id(match_uid, match_url)
+
+        match_dict: Dict[str, Any] = {
             "match_time_msk": match_time_msk.isoformat(),
             "time_msk": match_time_msk.strftime("%H:%M"),
             "team1": team1,
@@ -142,22 +231,85 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
             "tournament": tournament or "",
             "status": status or "unknown",
             "score": score,
-            "liquipedia_match_id": liquipedia_match_id,
-        })
+            "liquipedia_match_id": liquipedia_id,
+        }
 
-    logger.info(f"Получено {len(matches)} матчей для даты {target_date}")
-    return matches
+        # --- ключ для дедупликации ---
+        if liquipedia_id:
+            # если есть нормальный Liquipedia ID — доверяем ему
+            key = ("id", liquipedia_id)
+        else:
+            # fallback: по слоту и парам команд
+            key = (
+                "fallback",
+                match_time_msk.isoformat(),
+                (team1 or "").lower(),
+                (team2 or "").lower(),
+                (tournament or "").lower(),
+                bo_int or 0,
+            )
+
+        existing = matches_by_key.get(key)
+        if existing is None:
+            matches_by_key[key] = match_dict
+        else:
+            # выбираем "лучший" матч:
+            # 1) у кого есть нормальный score (не None и не "0:0")
+            # 2) если одинаково — у кого есть bo
+            def score_weight(s: Optional[str]) -> int:
+                if not s or s == "0:0":
+                    return 0
+                return 1
+
+            cur_score = existing.get("score")
+            new_score = score
+
+            if score_weight(new_score) > score_weight(cur_score):
+                matches_by_key[key] = match_dict
+            elif score_weight(new_score) == score_weight(cur_score):
+                cur_bo = existing.get("bo") or 0
+                new_bo = bo_int or 0
+                if new_bo > cur_bo:
+                    matches_by_key[key] = match_dict
+
+    # --- превращаем в список ---
+    matches = list(matches_by_key.values())
+
+    # --- фильтрация TBD-плейсхолдеров ---
+    # если в том же турнире и в то же время есть матч с нормальными командами,
+    # то матчи с TBD в этом слоте выкидываем.
+    non_tbd_slots: set[tuple[str, str]] = set()
+    for m in matches:
+        if m["team1"] != "TBD" and m["team2"] != "TBD":
+            non_tbd_slots.add((m["match_time_msk"], m["tournament"]))
+
+    filtered_matches: List[Dict[str, Any]] = []
+    for m in matches:
+        if (m["team1"] == "TBD" or m["team2"] == "TBD") and (
+            m["match_time_msk"],
+            m["tournament"],
+        ) in non_tbd_slots:
+            # есть нормальный матч в этом же слоте — TBD-версию выкидываем
+            continue
+        filtered_matches.append(m)
+
+    logger.info(f"Получено {len(filtered_matches)} матчей для даты {target_date}")
+    return filtered_matches
+
 
 async def get_matches_with_tournament_filter(
-    target_date: date, 
-    tournament_ids: Optional[List[int]] = None
+        target_date: date,
+        tournament_ids: Optional[List[int]] = None
 ) -> List[Dict[str, Any]]:
     """
     Получает матчи с возможной фильтрацией по турнирам.
     Использует JOIN с таблицей tournaments для оптимизации.
+    Плюс:
+      - вытаскивает liquipedia_match_id;
+      - убирает дубли.
     """
     tz_msk = _get_timezone_msk()
-    
+
     query = """
         SELECT
             dm.match_time_msk,
@@ -167,34 +319,50 @@ async def get_matches_with_tournament_filter(
             dm.tournament,
             dm.status,
             dm.score,
-            dm.liquipedia_match_id
+            dm.liquipedia_match_id,
+            dm.match_uid,
+            dm.match_url
         FROM dota_matches dm
     """
-    
+
     params = [target_date]
-    
+
     if tournament_ids:
         query += " JOIN tournaments t ON dm.tournament_id = t.id WHERE t.id = ANY(%s) AND"
         params.append(tournament_ids)
     else:
         query += " WHERE"
-    
+
     query += " (dm.match_time_msk AT TIME ZONE 'Europe/Moscow')::date = %s ORDER BY dm.match_time_msk;"
-    
+
     async with db_pool.get_connection() as cur:
         await cur.execute(query, params)
         rows = await cur.fetchall()
 
-    matches = []
+    matches_by_key: Dict[Any, Dict[str, Any]] = {}
+
     for row in rows:
-        match_time_msk, team1, team2, bo_int, tournament, status, score, liquipedia_match_id = row
+        (
+            match_time_msk,
+            team1,
+            team2,
+            bo_int,
+            tournament,
+            status,
+            score,
+            liqui_in_db,
+            match_uid,
+            match_url,
+        ) = row
 
         if match_time_msk.tzinfo is None:
             match_time_msk = match_time_msk.replace(tzinfo=timezone.utc).astimezone(tz_msk)
         else:
             match_time_msk = match_time_msk.astimezone(tz_msk)
 
-        matches.append({
+        liquipedia_id = liqui_in_db or extract_liquipedia_id(match_uid, match_url)
+
+        match_dict = {
             "match_time_msk": match_time_msk.isoformat(),
             "time_msk": match_time_msk.strftime("%H:%M"),
             "team1": team1,
@@ -203,10 +371,43 @@ async def get_matches_with_tournament_filter(
             "tournament": tournament or "",
             "status": status or "unknown",
             "score": score,
-            "liquipedia_match_id": liquipedia_match_id,
-        })
+            "liquipedia_match_id": liquipedia_id,
+        }
 
-    return matches
+        if liquipedia_id:
+            key = ("id", liquipedia_id)
+        else:
+            key = (
+                "fallback",
+                match_time_msk.isoformat(),
+                (team1 or "").lower(),
+                (team2 or "").lower(),
+                (tournament or "").lower(),
+                bo_int or 0,
+            )
+
+        existing = matches_by_key.get(key)
+        if existing is None:
+            matches_by_key[key] = match_dict
+        else:
+            def score_weight(s: Optional[str]) -> int:
+                if not s or s == "0:0":
+                    return 0
+                return 1
+
+            cur_score = existing.get("score")
+            new_score = score
+
+            if score_weight(new_score) > score_weight(cur_score):
+                matches_by_key[key] = match_dict
+            elif score_weight(new_score) == score_weight(cur_score):
+                cur_bo = existing.get("bo") or 0
+                new_bo = bo_int or 0
+                if new_bo > cur_bo:
+                    matches_by_key[key] = match_dict
+
+    return list(matches_by_key.values())
+
 
 # ---------- FastAPI-приложение с улучшениями ----------
 

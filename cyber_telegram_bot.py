@@ -37,7 +37,7 @@ if not TELEGRAM_BOT_TOKEN:
 
 MATCHES_API_URL = os.getenv(
     "MATCHES_API_URL",
-    "http://45.10.245.84:8050/dota/matches/today",
+    "http://cyber-api.solar.shaneque.ru/dota/matches/today",
 )
 
 # Базовый URL для /dota/matches/DD-MM-YYYY

@@ -443,6 +443,71 @@ def get_match_by_id(match_id: int) -> Optional[Match]:
 
 # -------------------- Вспомогательные функции матчей --------------------
 
+def _get_time_until(match_time_msk: datetime, now_msk: datetime) -> str:
+    """
+    Вычисляет относительное время до начала матча.
+
+    Возвращает:
+    - "⚡ Через X мин (HH:MM)" если < 60 минут
+    - "⏰ Через X ч Y мин (HH:MM)" если < 24 часов
+    - "⏰ HH:MM" если >= 24 часов
+    """
+    delta = match_time_msk - now_msk
+    total_minutes = int(delta.total_seconds() / 60)
+
+    if total_minutes < 60:
+        return f"⚡ Через {total_minutes} мин ({match_time_msk.strftime('%H:%M')})"
+    elif total_minutes < 1440:  # < 24 часов
+        hours = total_minutes // 60
+        mins = total_minutes % 60
+        if mins > 0:
+            return f"⏰ Через {hours} ч {mins} мин ({match_time_msk.strftime('%H:%M')})"
+        return f"⏰ Через {hours} ч ({match_time_msk.strftime('%H:%M')})"
+    else:
+        return f"⏰ {match_time_msk.strftime('%H:%M')}"
+
+
+def _pluralize_matches(count: int) -> str:
+    """
+    Правильное склонение слова 'матч' в зависимости от числа.
+
+    Примеры:
+    - 1 матч, 21 матч
+    - 2 матча, 3 матча, 4 матча, 22 матча
+    - 5 матчей, 11 матчей, 25 матчей
+    """
+    if count % 10 == 1 and count % 100 != 11:
+        return f"{count} матч"
+    elif 2 <= count % 10 <= 4 and (count % 100 < 10 or count % 100 >= 20):
+        return f"{count} матча"
+    else:
+        return f"{count} матчей"
+
+
+def _determine_winner(score: Optional[str]) -> int:
+    """
+    Определяет победителя по счёту.
+
+    Возвращает:
+    - 1 если победила первая команда
+    - 2 если победила вторая команда
+    - 0 если неизвестно (ничья или не удалось распарсить)
+    """
+    if not score:
+        return 0
+    try:
+        parts = score.replace(':', '-').split('-')
+        if len(parts) == 2:
+            score1, score2 = int(parts[0].strip()), int(parts[1].strip())
+            if score1 > score2:
+                return 1
+            elif score2 > score1:
+                return 2
+    except Exception:
+        pass
+    return 0
+
+
 async def fetch_with_retry(
     url: str,
     max_retries: int = 3,
@@ -656,44 +721,139 @@ async def fetch_matches_for_day(day: date) -> List[Match]:
 
 
 
-def _format_match_line(m: Match, group: str) -> str:
+def _format_match_line(m: Match, group: str, now_msk: Optional[datetime] = None) -> str:
     """
-    Пример:
-    ⏰ 15:00 <a href="...">AVULUS</a> vs <a href="...">Passion</a> (Bo3) [CCT S2 Series 6] 1:0
-    """
-    time_part = m.time_msk or m.match_time_msk.strftime("%H:%M")
+    Форматирует строку матча в зависимости от его статуса.
 
-    # Если есть URL — делаем кликабельное имя
+    Форматы:
+    - upcoming: многострочный с относительным временем
+      ⚡ Через 7 мин (21:15)
+         <b>Team1</b> vs <b>Team2</b> • Bo3
+         📺 Tournament
+
+    - live: многострочный с текущим счётом
+      🔴 15:00
+         <b>Team1</b> 1:1 <b>Team2</b> • Bo3
+         📺 Tournament
+
+    - finished: двухстрочный с трофеем победителя
+      🏆 <b>Winner</b> 2:0 Loser (15:00)
+         📺 Tournament
+    """
+    # Подготовка названий команд (с ссылками или без)
     if m.team1_url:
         team1 = f'<a href="{m.team1_url}">{m.team1}</a>'
     else:
-        team1 = m.team1
+        team1 = m.team1 or "TBD"
 
     if m.team2_url:
         team2 = f'<a href="{m.team2_url}">{m.team2}</a>'
     else:
-        team2 = m.team2
+        team2 = m.team2 or "TBD"
 
-    parts = [f"⏰ {time_part}", f"{team1} vs {team2}"]
+    # Делаем команды жирными для лучшей видимости
+    team1_bold = f"<b>{team1}</b>"
+    team2_bold = f"<b>{team2}</b>"
 
-    if m.bo:
-        parts.append(f"(Bo{m.bo})")
-    if m.tournament:
-        parts.append(f"[{m.tournament}]")
-    if m.score and group in ("live", "finished"):
-        parts.append(m.score)
+    time_str = m.time_msk or m.match_time_msk.strftime("%H:%M")
 
-    return " ".join(parts)
+    # Формирование строки в зависимости от статуса
+    if group == "upcoming":
+        # Относительное время для будущих матчей
+        if now_msk:
+            time_display = _get_time_until(m.match_time_msk, now_msk)
+        else:
+            time_display = f"⏰ {time_str}"
+
+        # Первая строка: время
+        line1 = time_display
+
+        # Вторая строка: команды и Bo
+        parts = [f"{team1_bold} vs {team2_bold}"]
+        if m.bo:
+            parts.append(f"Bo{m.bo}")
+        line2 = "   " + " • ".join(parts)
+
+        # Третья строка: турнир
+        if m.tournament:
+            line3 = f"   📺 {m.tournament}"
+            return f"{line1}\n{line2}\n{line3}"
+        else:
+            return f"{line1}\n{line2}"
+
+    elif group == "live":
+        # LIVE матчи
+        line1 = f"🔴 {time_str}"
+
+        # Вторая строка: команды со счётом
+        if m.score:
+            parts = [f"{team1_bold} {m.score} {team2_bold}"]
+        else:
+            parts = [f"{team1_bold} vs {team2_bold}"]
+
+        if m.bo:
+            parts.append(f"Bo{m.bo}")
+        line2 = "   " + " • ".join(parts)
+
+        # Третья строка: турнир
+        if m.tournament:
+            line3 = f"   📺 {m.tournament}"
+            return f"{line1}\n{line2}\n{line3}"
+        else:
+            return f"{line1}\n{line2}"
+
+    elif group == "finished":
+        # Завершённые матчи с трофеем для победителя
+        winner = _determine_winner(m.score)
+
+        # Извлекаем чистые названия команд (без HTML тегов) для проигравшей команды
+        import re
+        team1_name = re.sub(r'<[^>]+>', '', team1)
+        team2_name = re.sub(r'<[^>]+>', '', team2)
+
+        if winner == 1:
+            # Победила первая команда
+            line1 = f"🏆 {team1_bold} {m.score or '?:?'} {team2_name} ({time_str})"
+        elif winner == 2:
+            # Победила вторая команда
+            line1 = f"🏆 {team2_bold} {m.score or '?:?'} {team1_name} ({time_str})"
+        else:
+            # Неизвестный победитель или ничья
+            line1 = f"⏰ {team1_bold} {m.score or '?:?'} {team2_bold} ({time_str})"
+
+        # Вторая строка: турнир
+        if m.tournament:
+            line2 = f"   📺 {m.tournament}"
+            return f"{line1}\n{line2}"
+        else:
+            return line1
+
+    else:
+        # Фоллбэк на старый формат, если группа неизвестна
+        parts = [f"⏰ {time_str}", f"{team1} vs {team2}"]
+        if m.bo:
+            parts.append(f"(Bo{m.bo})")
+        if m.tournament:
+            parts.append(f"[{m.tournament}]")
+        if m.score:
+            parts.append(m.score)
+        return " ".join(parts)
 
 
 
 def build_core_text(matches: List[Match], day: date) -> str:
     """
-    Формирует текстовую часть сообщения по матчам.
+    Формирует текстовую часть сообщения по матчам с улучшенным форматированием.
+
     Категории:
       - LIVE
       - Скоро начнутся (не finished, не live и временем в будущем)
       - Завершённые
+
+    Новый формат:
+      - Разделители между секциями (━━━━)
+      - Счётчики в заголовках секций ("🟢 LIVE • 3 матча")
+      - Всегда показываются все три секции (даже пустые)
     """
     now_msk = datetime.now(MSK_TZ)
 
@@ -722,34 +882,47 @@ def build_core_text(matches: List[Match], day: date) -> str:
     finished.sort(key=lambda m: m.match_time_msk)
 
     parts: List[str] = []
+    separator = "━" * 21  # Визуальный разделитель
 
     # Заголовок
-    parts.append(f"📅 Матчи на {day.strftime('%d.%m.%Y')} (МСК)\n")
+    parts.append(f"📅 Матчи на {day.strftime('%d.%m.%Y')} (МСК)")
+    parts.append(separator)
 
-    # LIVE
+    # LIVE секция (всегда показываем, даже если пустая)
+    live_header = f"🟢 LIVE • {_pluralize_matches(len(live))}"
     if live:
-        lines = ["🟢 LIVE"] + [_format_match_line(m, "live") for m in live]
+        lines = [live_header] + [_format_match_line(m, "live", now_msk) for m in live]
         parts.append("\n".join(lines))
+    else:
+        parts.append(live_header)
 
-    # Скоро начнутся
+    parts.append(separator)
+
+    # Скоро начнутся секция (всегда показываем)
+    upcoming_header = f"⏰ Скоро начнутся • {_pluralize_matches(len(upcoming))}"
     if upcoming:
-        lines = ["⏰ Скоро начнутся"] + [_format_match_line(m, "upcoming") for m in upcoming]
+        lines = [upcoming_header] + [_format_match_line(m, "upcoming", now_msk) for m in upcoming]
         parts.append("\n".join(lines))
+    else:
+        parts.append(upcoming_header)
 
-    # Завершённые
+    parts.append(separator)
+
+    # Завершённые секция (всегда показываем)
+    finished_header = f"✅ Завершённые • {_pluralize_matches(len(finished))}"
     if finished:
-        lines = ["✅ Завершённые"] + [_format_match_line(m, "finished") for m in finished]
+        lines = [finished_header] + [_format_match_line(m, "finished", now_msk) for m in finished]
         parts.append("\n".join(lines))
+    else:
+        parts.append(finished_header)
 
-    # Итоги — считаем только то, что реально попало в список
+    parts.append(separator)
+
+    # Итоговая статистика
     total = len(live) + len(upcoming) + len(finished)
-    live_count = len(live)
-    upcoming_count = len(upcoming)
-    finished_count = len(finished)
-
     parts.append(
-        f"\n📊 Всего матчей: {total} "
-        f"(LIVE: {live_count}, скоро: {upcoming_count}, завершено: {finished_count})"
+        f"📊 Итого: {_pluralize_matches(total)} "
+        f"(LIVE: {len(live)} • Скоро: {len(upcoming)} • Завершено: {len(finished)})"
     )
 
     return "\n\n".join(parts)

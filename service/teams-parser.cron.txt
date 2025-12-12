@@ -1,0 +1,1 @@
+0 * * * * cd /home/littleauto/cyberboohta && set -a && . /home/littleauto/cyberboohta/.env && set +a && /home/littleauto/cyberboohta/venv/bin/python /home/littleauto/cyberboohta/teams_parser.py >> /home/littleauto/cyberboohta/logs/team_parser.cron.log 2>&1

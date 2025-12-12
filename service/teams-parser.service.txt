@@ -1,0 +1,25 @@
+[Unit]
+Description=CyberMatches Liquipedia Teams Parser
+After=network.target
+Wants=network.target
+
+[Service]
+Type=oneshot
+User=littleauto
+WorkingDirectory=/home/littleauto/cyberboohta
+
+# 🔑 ВАЖНО: виртуальное окружение
+Environment="VIRTUAL_ENV=/home/littleauto/cyberboohta/.venv"
+Environment="PATH=/home/littleauto/cyberboohta/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin"
+
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/home/littleauto/cyberboohta/.env
+
+ExecStart=/home/littleauto/cyberboohta/.venv/bin/python /home/littleauto/cyberboohta/teams_parser.py
+
+# safety
+TimeoutStartSec=10min
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

@@ -2,5 +2,4 @@
 .venv/
 temp/
 *.log
-.env.env # если ещё нет
-git commit -m "Remove .env from repo and ignore it"
+.env

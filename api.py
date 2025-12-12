@@ -123,25 +123,6 @@ class DatabasePool:
 db_pool = DatabasePool()
 
 # Синхронное соединение для вспомогательных запросов (например, получения URL команды)
-conn_sync: psycopg.Connection | None = None
-
-def get_sync_connection() -> psycopg.Connection:
-    """
-    Ленивая инициализация синхронного соединения с БД.
-    Если соединение отсутствует или закрыто — создаём новое.
-    Используется для вспомогательных запросов, где удобно работать через sync-API psycopg.
-    """
-    global conn_sync
-    if conn_sync is None or getattr(conn_sync, "closed", False):
-        conn_sync = psycopg.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD,
-        )
-    return conn_sync
-
 
 # ---------- Кэширование и оптимизация ----------
 
@@ -218,6 +199,19 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
         )
         rows = await cur.fetchall()
 
+    # Собираем все уникальные названия команд для batch загрузки
+    all_team_names = []
+    for row in rows:
+        team1 = row[1]
+        team2 = row[2]
+        if team1:
+            all_team_names.append(team1)
+        if team2:
+            all_team_names.append(team2)
+
+    # Batch загрузка URL команд (1 запрос вместо N)
+    team_urls = await get_team_urls_batch(all_team_names)
+
     matches_by_key: Dict[Any, Dict[str, Any]] = {}
 
     for row in rows:
@@ -248,9 +242,9 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
             "match_time_msk": match_time_msk.isoformat(),
             "time_msk": match_time_msk.strftime("%H:%M"),
             "team1": team1,
-            "team1_url": get_team_url(get_sync_connection(), team1),
+            "team1_url": team_urls.get(team1) if team1 else None,
             "team2": team2,
-            "team2_url": get_team_url(get_sync_connection(), team2),
+            "team2_url": team_urls.get(team2) if team2 else None,
             "bo": bo_int,
             "tournament": tournament or "",
             "status": status or "unknown",
@@ -363,6 +357,19 @@ async def get_matches_with_tournament_filter(
         await cur.execute(query, params)
         rows = await cur.fetchall()
 
+    # Собираем все уникальные названия команд для batch загрузки
+    all_team_names = []
+    for row in rows:
+        team1 = row[1]
+        team2 = row[2]
+        if team1:
+            all_team_names.append(team1)
+        if team2:
+            all_team_names.append(team2)
+
+    # Batch загрузка URL команд (1 запрос вместо N)
+    team_urls = await get_team_urls_batch(all_team_names)
+
     matches_by_key: Dict[Any, Dict[str, Any]] = {}
 
     for row in rows:
@@ -387,16 +394,15 @@ async def get_matches_with_tournament_filter(
         liquipedia_id = liqui_in_db or extract_liquipedia_id(match_uid, match_url)
 
         match_dict = {
-            "match_id": match_id,
+            "liquipedia_match_id": liquipedia_id,
             "team1": team1,
-            "team1_url": get_team_url(get_sync_connection(), team1),
+            "team1_url": team_urls.get(team1) if team1 else None,
             "team2": team2,
-            "team2_url": get_team_url(get_sync_connection(), team2),
+            "team2_url": team_urls.get(team2) if team2 else None,
             "bo": bo_int,
             "tournament": tournament or "",
             "status": status or "unknown",
             "score": score,
-            "liquipedia_match_id": liquipedia_id,
         }
 
         if liquipedia_id:
@@ -451,6 +457,39 @@ def get_team_url(conn, team_name: str) -> str | None:
         row = cur.fetchone()
         return row[0] if row else None
 
+
+async def get_team_urls_batch(team_names: List[str]) -> Dict[str, Optional[str]]:
+    """
+    Пакетная загрузка URL команд за один запрос.
+    Возвращает dict: {team_name: liquipedia_url or None}
+    """
+    if not team_names:
+        return {}
+
+    # Убираем None и дубликаты, сохраняя оригинальный регистр
+    unique_names = list(set(name for name in team_names if name))
+    if not unique_names:
+        return {}
+
+    async with db_pool.get_connection() as cur:
+        # Используем ANY для запроса всех команд за раз
+        await cur.execute(
+            """
+            SELECT name, liquipedia_url
+            FROM dota_teams
+            WHERE LOWER(name) = ANY(%s);
+            """,
+            ([name.lower() for name in unique_names],),
+        )
+        rows = await cur.fetchall()
+
+    # Строим case-insensitive lookup
+    result = {name.lower(): None for name in unique_names}
+    for row_name, row_url in rows:
+        result[row_name.lower()] = row_url
+
+    # Маппим обратно на оригинальный регистр
+    return {name: result.get(name.lower()) for name in team_names}
 
 
 # ---------- FastAPI-приложение с улучшениями ----------

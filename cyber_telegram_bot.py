@@ -6,7 +6,7 @@ import logging.handlers
 import os
 from dataclasses import dataclass
 from datetime import datetime, date, timedelta
-from typing import Dict, Optional, List, Set
+from typing import Dict, Optional, List, Set, Any
 
 import aiohttp
 import psycopg
@@ -120,6 +120,10 @@ class TodayMessageState:
 poll_task: Optional[asyncio.Task] = None
 daily_task: Optional[asyncio.Task] = None
 last_daily_notify_date: Optional[date] = None
+
+# Модульный кэш с блокировкой для потокобезопасности
+_matches_cache: Dict[date, List["Match"]] = {}
+_cache_lock = asyncio.Lock()
 
 UPDATED_MARKER = "\n\n🔄 Обновлено в "
 
@@ -439,6 +443,56 @@ def get_match_by_id(match_id: int) -> Optional[Match]:
 
 # -------------------- Вспомогательные функции матчей --------------------
 
+async def fetch_with_retry(
+    url: str,
+    max_retries: int = 3,
+    timeout: int = 10,
+    backoff_base: float = 2.0
+) -> Optional[Any]:
+    """
+    HTTP запрос с экспоненциальным backoff.
+
+    Args:
+        url: URL для запроса
+        max_retries: Максимальное количество попыток
+        timeout: Timeout запроса в секундах
+        backoff_base: Множитель для exponential backoff
+
+    Returns:
+        Распарсенные JSON данные или None при ошибке
+    """
+    last_exception = None
+
+    for attempt in range(max_retries + 1):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=timeout) as resp:
+                    resp.raise_for_status()
+                    data = await resp.json()
+
+                    if attempt > 0:
+                        logger.info("Успех после %d попыток: %s", attempt + 1, url)
+                    return data
+
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            last_exception = e
+
+            if attempt < max_retries:
+                delay = backoff_base ** attempt  # 1s, 2s, 4s
+                logger.warning(
+                    "Ошибка запроса (попытка %d/%d): %s. Повтор через %.1f сек.",
+                    attempt + 1,
+                    max_retries + 1,
+                    e,
+                    delay
+                )
+                await asyncio.sleep(delay)
+            else:
+                logger.error("Все попытки исчерпаны для %s: %s", url, e, exc_info=True)
+
+    return None
+
+
 def build_matches_url_for_day(day: date) -> str:
     return f"{MATCHES_API_BASE_URL}/{day.strftime('%d-%m-%Y')}"
 
@@ -516,43 +570,25 @@ def deduplicate_matches(matches: List[Match]) -> List[Match]:
 
 async def fetch_matches_for_day(day: date) -> List[Match]:
     """
-    Тянем матчи из API для указанного дня.
+    Потокобезопасная загрузка матчей из API с retry и кэшированием.
     При ошибке сети/таймауте/парсинга возвращаем
     последний успешный результат для этого дня (если он есть),
     чтобы не моргать пустыми сообщениями в Телеге.
     """
-    # Простейший in-memory кэш на уровне функции:
-    # { date: List[Match] }
-    if not hasattr(fetch_matches_for_day, "_cache"):
-        fetch_matches_for_day._cache = {}  # type: ignore[attr-defined]
-    cache: Dict[date, List[Match]] = fetch_matches_for_day._cache  # type: ignore[attr-defined]
-
     url = build_matches_url_for_day(day)
     logger.info("Запрос матчей из API: %s для дня %s", url, day.isoformat())
 
-    data = None
-
-    # --- 1. Пытаемся сходить в API ---
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=10) as resp:
-                resp.raise_for_status()
-                data = await resp.json()
-    except Exception as e:
-        logger.error("Ошибка API для дня %s: %s", day.isoformat(), e, exc_info=True)
-
-        # Если у нас уже был успешный ответ на этот день — возвращаем его
-        if day in cache:
-            logger.info(
-                "Используем закешированный список матчей для дня %s из-за ошибки API",
-                day,
-            )
-            return cache[day]
-
-        # Кэша нет (например, бот только что запустился) — отдаём пустой список
+    # Попытка загрузить из API с retry
+    data = await fetch_with_retry(url, max_retries=3, timeout=10)
+    if data is None:
+        # Вернуть кэш при ошибке
+        async with _cache_lock:
+            if day in _matches_cache:
+                logger.info("Используем кэш для %s", day)
+                return _matches_cache[day]
         return []
 
-    # --- 2. Парсим JSON и собираем список матчей ---
+    # --- Парсим JSON и собираем список матчей ---
     try:
         matches_raw = data.get("matches", [])
 
@@ -600,24 +636,21 @@ async def fetch_matches_for_day(day: date) -> List[Match]:
 
         result = deduplicate_matches(result)
 
-        # Успешно спарсили — обновляем кэш для этого дня
-        cache[day] = result
-        logger.info(
-            "В кэше теперь %s матчей для дня %s", len(result), day.isoformat()
-        )
+        # Успешно спарсили — обновляем кэш безопасно
+        async with _cache_lock:
+            _matches_cache[day] = result
+            logger.info("Кэш обновлён: %s матчей для %s", len(result), day)
 
         return result
 
     except Exception as e:
-        logger.error("Ошибка парсинга API для дня %s: %s", day, e, exc_info=True)
+        logger.error("Ошибка парсинга для %s: %s", day, e, exc_info=True)
 
         # Если парсер упал, но в кэше есть старые матчи — используем их
-        if day in cache:
-            logger.info(
-                "Используем закешированный список матчей для дня %s из-за ошибки парсинга",
-                day,
-            )
-            return cache[day]
+        async with _cache_lock:
+            if day in _matches_cache:
+                logger.info("Используем кэш после ошибки парсинга для %s", day)
+                return _matches_cache[day]
 
         return []
 
@@ -1499,16 +1532,35 @@ async def main():
     daily_task = asyncio.create_task(daily_notifier(bot))
     reminders_task = asyncio.create_task(reminders_notifier(bot))
 
-
     try:
         await dp.start_polling(bot)
     finally:
-        for task_name, task in (("poll_task", poll_task), ("daily_task", daily_task)):
+        logger.info("Shutdown: cancelling background tasks...")
+
+        tasks_to_cancel = [
+            ("poll_task", poll_task),
+            ("daily_task", daily_task),
+            ("reminders_task", reminders_task),  # ДОБАВЛЕНО
+        ]
+
+        for task_name, task in tasks_to_cancel:
             if task and not task.done():
-                logger.info("Останавливаем задачу %s", task_name)
+                logger.info("Cancelling %s...", task_name)
                 task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await task
+
+        # Даем время на сохранение состояния
+        await asyncio.sleep(0.5)
+
+        for task_name, task in tasks_to_cancel:
+            if task and not task.done():
+                try:
+                    await asyncio.wait_for(task, timeout=5.0)
+                    logger.info("%s stopped cleanly", task_name)
+                except asyncio.TimeoutError:
+                    logger.warning("%s didn't stop within timeout", task_name)
+                except asyncio.CancelledError:
+                    logger.info("%s cancelled", task_name)
+
         logger.info("Бот остановлен")
 
 

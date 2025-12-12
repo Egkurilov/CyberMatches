@@ -16,6 +16,7 @@ except ImportError:
 
 import json
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 import re
 import time
@@ -39,19 +40,30 @@ LOG_DIR = os.path.join(BASE_DIR, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 LOG_FILE = os.path.join(LOG_DIR, "parser.log")
 
+# Настройка логирования с ротацией
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        # Console handler
+        logging.StreamHandler(),
+        # File handler с ротацией: макс 10MB на файл, хранить 5 бэкапов
+        RotatingFileHandler(
+            LOG_FILE,
+            maxBytes=10_000_000,  # 10 MB
+            backupCount=5,
+            encoding="utf-8"
+        )
+    ]
 )
 logger = logging.getLogger(__name__)
 
 
 def log_event(event: dict):
-    """Пишем одну строку JSON в лог-файл."""
+    """Log structured event as JSON."""
     event["time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     line = json.dumps(event, ensure_ascii=False)
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(line + "\n")
+    logger.info(line)
 
 
 # ---------------------------------------------------------------------------
@@ -95,44 +107,26 @@ MONTHS: dict[str, int] = {
     "December": 12,
 }
 
-# таймзоны, которые может возвращать Liquipedia в таймере
-TZ_OFFSETS = {
-    "MSK": 3,
-    "CET": 1,
-    "CEST": 2,
-    "EET": 2,
-    "EEST": 3,
-    "SGT": 8,
-    "UTC": 0,
-    "GMT": 0,
-    "PET": -5,
-    "GST": 4,  # Gulf Standard Time (Asia/Dubai), UTC+4
+# Timezone mapping к IANA timezone names (автоматически обрабатывает DST)
+TZ_IANA_MAP = {
+    "MSK": "Europe/Moscow",      # Handles any future DST changes
+    "CET": "Europe/Berlin",      # Auto-switches CET ↔ CEST
+    "CEST": "Europe/Berlin",
+    "EET": "Europe/Athens",      # Auto-switches EET ↔ EEST
+    "EEST": "Europe/Athens",
+    "SGT": "Asia/Singapore",
+    "HKT": "Asia/Hong_Kong",
+    "CST": "Asia/Shanghai",      # China Standard Time
+    "KST": "Asia/Seoul",
+    "JST": "Asia/Tokyo",
+    "IST": "Asia/Kolkata",       # India (no DST)
+    "PET": "America/Lima",       # Peru (no DST)
+    "GST": "Asia/Dubai",         # Gulf Standard Time
+    "UTC": "UTC",
+    "GMT": "UTC",
 }
 
-TZ_OFFSETS_MINUTES: dict[str, int] = {
-    "UTC": 0,
-    "GMT": 0,
-
-    # Европа
-    "CET": 60,   # UTC+1
-    "CEST": 120, # UTC+2
-    "EET": 120,  # UTC+2
-    "EEST": 180, # UTC+3
-    "MSK": 180,  # UTC+3
-
-    # Азия
-    "SGT": 480,  # UTC+8 (Singapore)
-    "HKT": 480,  # UTC+8 (Hong Kong)
-    "CST": 480,  # UTC+8 (China Standard Time)
-    "KST": 540,  # UTC+9 (Korea)
-    "JST": 540,  # UTC+9 (Japan)
-
-    # Индия
-    "IST": 330,  # UTC+5:30 India Standard Time
-    "PET": -300,  # UTC-5
-}
-
-MSK_TZ = timezone(timedelta(hours=3))
+MSK_TZ = ZoneInfo("Europe/Moscow")
 
 # ---------------------------------------------------------------------------
 # МОДЕЛИ
@@ -268,22 +262,24 @@ def parse_time_to_msk(time_str: str) -> Optional[datetime]:
         )
         return None
 
-    offset_minutes = TZ_OFFSETS_MINUTES.get(tz_abbr)
-    if offset_minutes is None:
-        logger.warning(
-            "parse_time_to_msk: неизвестный таймзон '%s' в строке '%s'",
-            tz_abbr,
-            time_str,
-        )
-        src_tz = timezone.utc
-    else:
-        # ВАЖНО: тут таймзона в МИНУТАХ, а не в часах
-        src_tz = timezone(timedelta(minutes=offset_minutes))
+    # Get IANA timezone name
+    tz_name = TZ_IANA_MAP.get(tz_abbr)
+    if not tz_name:
+        logger.warning("Неизвестная timezone '%s' в '%s', используем UTC", tz_abbr, time_str)
+        tz_name = "UTC"
 
-    dt_src = dt_naive.replace(tzinfo=src_tz)
-    dt_msk = dt_src.astimezone(MSK_TZ)
+    # Localize to source timezone (handles DST automatically)
+    try:
+        src_tz = ZoneInfo(tz_name)
+        dt_src = dt_naive.replace(tzinfo=src_tz)
 
-    return dt_msk
+        # Convert to MSK
+        dt_msk = dt_src.astimezone(MSK_TZ)
+        return dt_msk
+
+    except Exception as e:
+        logger.error("Timezone conversion failed for '%s': %s", time_str, e)
+        return None
 
 
 def parse_bo_int(bo: Optional[str]) -> Optional[int]:

@@ -535,6 +535,7 @@ def parse_liquipedia_time(raw: str) -> tuple[datetime | None, datetime | None]:
         "EET": "Europe/Bucharest",
         "BRT": "America/Sao_Paulo",   # Brazil Time, UTC-3
         "IST": "Asia/Kolkata",        # India Standard Time, UTC+5:30
+        "GST": "Asia/Dubai",          # Gulf Standard Time, UTC+4
     }
 
     tz_name = tz_map.get(tz_abbr)
@@ -1337,7 +1338,6 @@ def fetch_score_from_main_completed(team1: str, team2: str, tournament_clean: st
 
     try:
         html = fetch_html(url)
-        from improved_parser import parse_matches_from_html
         matches = parse_matches_from_html(html)
 
         print(f"[DEBUG] parse_matches_from_html вернул матчей: {len(matches)}")

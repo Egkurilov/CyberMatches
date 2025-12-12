@@ -321,7 +321,14 @@ def build_main_keyboard(
 
 
 # -------------------- работа с напоминаниями  --------------------
+import html
 
+def team_html(name: str, url: str | None) -> str:
+    safe_name = html.escape(name or "")
+    if url:
+        safe_url = html.escape(url)
+        return f'<a href="{safe_url}">{safe_name}</a>'
+    return safe_name
 
 def build_reminders_keyboard(matches: List[Match]) -> InlineKeyboardMarkup:
     """
@@ -806,20 +813,22 @@ def _format_match_line(m: Match, group: str, now_msk: Optional[datetime] = None)
         # Завершённые матчи с трофеем для победителя
         winner = _determine_winner(m.score)
 
-        # Извлекаем чистые названия команд (без HTML тегов) для проигравшей команды
-        import re
-        team1_name = re.sub(r'<[^>]+>', '', team1)
-        team2_name = re.sub(r'<[^>]+>', '', team2)
-
         if winner == 1:
-            # Победила первая команда
-            line1 = f"🏆 {team1_bold} {m.score or '?:?'} {team2_name} ({time_str})"
+            # Победила первая команда: победитель жирный, проигравший — с ссылкой (если она есть), но не жирный
+            line1 = f"🏆 {team1_bold} {m.score or '?:?'} {team2} ({time_str})"
         elif winner == 2:
             # Победила вторая команда
-            line1 = f"🏆 {team2_bold} {m.score or '?:?'} {team1_name} ({time_str})"
+            line1 = f"🏆 {team2_bold} {m.score or '?:?'} {team1} ({time_str})"
         else:
             # Неизвестный победитель или ничья
             line1 = f"⏰ {team1_bold} {m.score or '?:?'} {team2_bold} ({time_str})"
+
+        # Вторая строка: турнир
+        if m.tournament:
+            line2 = f"   📺 {m.tournament}"
+            return f"{line1}\n{line2}"
+        else:
+            return line1
 
         # Вторая строка: турнир
         if m.tournament:

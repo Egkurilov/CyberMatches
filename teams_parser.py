@@ -147,6 +147,31 @@ def slug_from_liquipedia_url(full_url: str) -> str:
     return path.lstrip("/")
 
 
+from urllib.parse import urlparse
+
+def canonical_liquipedia_path(value: str) -> str:
+    """
+    Приводит к виду: /dota2/Team_Liquid
+    Принимает:
+      - 'https://liquipedia.net/dota2/Team_Liquid?x=1' -> '/dota2/Team_Liquid'
+      - '/dota2/Team_Liquid' -> '/dota2/Team_Liquid'
+      - 'Team_Liquid' -> 'Team_Liquid' (на всякий)
+    """
+    if not value:
+        return ""
+
+    v = value.strip()
+
+    if v.startswith("http://") or v.startswith("https://"):
+        v = urlparse(v).path
+
+    # убрать query/fragment если вдруг пришло не URL, а строка с ?
+    v = v.split("?", 1)[0].split("#", 1)[0]
+    v = v.rstrip("/")
+
+    return v
+
+
 def parse_teams_from_portal(html: str) -> list[TeamRow]:
     """
     Берём команды через team-template, как в старой версии:

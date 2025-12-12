@@ -1,0 +1,26 @@
+[Unit]
+Description=CyberMatches Telegram Bot
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=littleauto
+WorkingDirectory=/home/littleauto/cyberboohta
+
+# 🔑 Виртуальное окружение
+Environment="VIRTUAL_ENV=/home/littleauto/cyberboohta/venv"
+Environment="PATH=/home/littleauto/cyberboohta/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin"
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/home/littleauto/cyberboohta/.env
+
+# 🤖 Запуск Telegram-бота из venv
+ExecStart=/home/littleauto/cyberboohta/venv/bin/python /home/littleauto/cyberboohta/cyber_telegram_bot.py
+
+Restart=always
+RestartSec=5
+TimeoutStartSec=30
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

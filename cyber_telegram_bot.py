@@ -292,6 +292,59 @@ def get_all_today_states_for_day(day: date) -> List[TodayMessageState]:
     logger.info("Для дня %s найдено today-состояний: %s", day, len(result))
     return result
 
+from collections import defaultdict
+from typing import List, Dict, Optional
+import html
+
+def format_finished_by_tournament(
+    date_str: str,
+    finished_matches: List[Dict],
+    updated_at: Optional[str] = None,
+    timezone_label: str = "МСК",
+) -> str:
+    if not finished_matches:
+        return f"{date_str} ({timezone_label})\n\nМатчей нет"
+
+    def team_link(name: str, url: Optional[str]) -> str:
+        safe_name = html.escape(name or "")
+        if url:
+            safe_url = html.escape(url)
+            return f'<a href="{safe_url}">{safe_name}</a>'
+        return safe_name
+
+    tournaments = defaultdict(list)
+    for m in finished_matches:
+        tournaments[m.get("tournament") or "Other"].append(m)
+
+    header = f"{date_str} ({timezone_label}) — {len(finished_matches)} матчей"
+    if updated_at:
+        header += f" • обновлено {updated_at}"
+
+    lines = [header, ""]
+
+    # турниры: по количеству матчей (desc)
+    for tournament, t_matches in sorted(tournaments.items(), key=lambda x: len(x[1]), reverse=True):
+        # жирный заголовок турнира + пустая строка после
+        lines.append(f"<b>{html.escape(tournament)}</b>  <i>({len(t_matches)})</i>")
+        lines.append("")
+
+        # внутри турнира сортируем по времени
+        t_matches_sorted = sorted(t_matches, key=lambda m: (m.get("time_msk") or ""))
+        for m in t_matches_sorted:
+            team1 = team_link(m.get("team1") or "?", m.get("team1_url"))
+            team2 = team_link(m.get("team2") or "?", m.get("team2_url"))
+            score = (m.get("score") or "?").replace(":", "–")
+            time_msk = m.get("time_msk") or ""
+            # компактно и читаемо
+            if time_msk:
+                lines.append(f"• {team1} {score} {team2} <i>({html.escape(time_msk)})</i>")
+            else:
+                lines.append(f"• {team1} {score} {team2}")
+
+        lines.append("")  # пустая строка между турнирами
+
+    return "\n".join(lines).strip()
+
 
 # -------------------- работа с напоминаниями  --------------------
 def build_main_keyboard(
@@ -640,6 +693,16 @@ def deduplicate_matches(matches: List[Match]) -> List[Match]:
     logger.info("Дедупликация: было %s матчей, осталось %s", len(matches), len(result))
     return result
 
+import re
+
+_url_tail_re = re.compile(r"\s*\((https?://[^)]+)\)\s*$")
+
+def clean_team_name(s: str) -> str:
+    if not s:
+        return s
+    return _url_tail_re.sub("", s).strip()
+
+
 async def fetch_matches_for_day(day: date) -> List[Match]:
     """
     Потокобезопасная загрузка матчей из API с retry и кэшированием.
@@ -692,8 +755,8 @@ async def fetch_matches_for_day(day: date) -> List[Match]:
                 Match(
                     match_time_msk=match_dt,
                     time_msk=raw.get("time_msk", ""),
-                    team1=fix_encoding(raw.get("team1", "")) or "",
-                    team2=fix_encoding(raw.get("team2", "")) or "",
+                    team1=clean_team_name(fix_encoding(raw.get("team1", "")) or ""),
+                    team2=clean_team_name(fix_encoding(raw.get("team2", "")) or ""),
                     bo=int(raw.get("bo", 0) or 0),
                     tournament=fix_encoding(raw.get("tournament", "")) or "",
                     status=raw.get("status", ""),
@@ -891,7 +954,7 @@ def build_core_text(matches: List[Match], day: date) -> str:
     finished.sort(key=lambda m: m.match_time_msk)
 
     parts: List[str] = []
-    separator = "━" * 21  # Визуальный разделитель
+    separator = "━" * 14  # Визуальный разделитель
 
     # Заголовок
     parts.append(f"📅 Матчи на {day.strftime('%d.%m.%Y')} (МСК)")
@@ -907,25 +970,64 @@ def build_core_text(matches: List[Match], day: date) -> str:
 
     parts.append(separator)
 
-    # Скоро начнутся секция (всегда показываем)
+    # Скоро начнутся секция (всегда показываем) — формат A (по турнирам)
     upcoming_header = f"⏰ Скоро начнутся • {_pluralize_matches(len(upcoming))}"
+    parts.append(upcoming_header)
+
     if upcoming:
-        lines = [upcoming_header] + [_format_match_line(m, "upcoming", now_msk) for m in upcoming]
-        parts.append("\n".join(lines))
-    else:
-        parts.append(upcoming_header)
+        tournaments: Dict[str, List[Match]] = defaultdict(list)
+        for m in upcoming:
+            tournaments[m.tournament or "Other"].append(m)
+
+        for tournament, t_matches in sorted(tournaments.items(), key=lambda x: len(x[1]), reverse=True):
+            parts.append(f"<b>{html.escape(tournament)}</b>  <i>({len(t_matches)})</i>")
+
+            t_matches_sorted = sorted(t_matches, key=lambda mm: mm.match_time_msk)
+
+            for m in t_matches_sorted:
+                t1 = team_html(m.team1 or "TBD", m.team1_url)
+                t2 = team_html(m.team2 or "TBD", m.team2_url)
+
+                # время “через …” используем твою функцию
+                time_display = _get_time_until(m.match_time_msk, now_msk)
+
+                bo_part = f" • Bo{m.bo}" if m.bo else ""
+                parts.append(f"• {time_display} — {t1} vs {t2}{bo_part}")
+
+            parts.append("")
 
     parts.append(separator)
 
-    # Завершённые секция (всегда показываем)
+    # Завершённые секция (всегда показываем) — формат A (по турнирам) + кликабельные команды
     finished_header = f"✅ Завершённые • {_pluralize_matches(len(finished))}"
-    if finished:
-        lines = [finished_header] + [_format_match_line(m, "finished", now_msk) for m in finished]
-        parts.append("\n".join(lines))
-    else:
-        parts.append(finished_header)
+    parts.append(finished_header)
 
-    parts.append(separator)
+    if finished:
+        # Группируем матчи по турнирам
+        tournaments: Dict[str, List[Match]] = defaultdict(list)
+        for m in finished:
+            tournaments[m.tournament or "Other"].append(m)
+
+        # Сортируем турниры по количеству матчей (desc)
+        for tournament, t_matches in sorted(tournaments.items(), key=lambda x: len(x[1]), reverse=True):
+            # Заголовок турнира — жирным, чтобы не сливался со списком
+            parts.append(f"<b>{html.escape(tournament)}</b>  <i>({len(t_matches)})</i>")
+
+            # Матчи внутри турнира — по времени
+            t_matches_sorted = sorted(t_matches, key=lambda mm: mm.match_time_msk)
+
+            # Рендер матчей
+            for m in t_matches_sorted:
+                t1 = team_html(m.team1 or "TBD", m.team1_url)
+                t2 = team_html(m.team2 or "TBD", m.team2_url)
+
+                score = (m.score or "?:?").replace(":", "–")
+                time_str = m.time_msk or m.match_time_msk.strftime("%H:%M")
+
+                parts.append(f"• {t1} {score} {t2} <i>({html.escape(time_str)})</i>")
+
+            # Пустая строка после каждого турнира (визуально помогает)
+            parts.append("")
 
     # Итоговая статистика
     total = len(live) + len(upcoming) + len(finished)
@@ -934,7 +1036,7 @@ def build_core_text(matches: List[Match], day: date) -> str:
         f"(LIVE: {len(live)} • Скоро: {len(upcoming)} • Завершено: {len(finished)})"
     )
 
-    return "\n\n".join(parts)
+    return "\n".join(parts).strip()
 
 
 def make_full_text(core: str, now_msk: datetime) -> str:
@@ -968,138 +1070,161 @@ def build_tournaments_keyboard(matches: List[Match], excluded: Set[str]) -> Opti
 
 
 # -------------------- Фоновый поллер матчей --------------------
+
+def _all_finished(matches: List[Match]) -> bool:
+    """True, если все матчи в списке имеют статус finished (пустой список -> True)."""
+    for m in matches:
+        if (m.status or "").lower() != "finished":
+            return False
+    return True
+
+
+async def _update_today_states_for_day(
+    bot: Bot,
+    day: date,
+    matches: List[Match],
+) -> None:
+    """
+    Обновляет today-сообщения для day.
+
+    Правила:
+    - сравниваем core (без "Обновлено")
+    - если core не изменился:
+        * для today — можно обновить клавиатуру (напоминания/фильтры)
+        * для прошлых дней, когда все finished — НЕ трогаем вообще ничего
+    - при обновлении клавиатуры игнорируем "message is not modified"
+    """
+    states = get_all_today_states_for_day(day)
+    if not states:
+        return
+
+    now_msk = datetime.now(MSK_TZ)
+    today = now_msk.date()
+
+    # ✅ закрытый прошлый день: не дёргаем ни текст, ни клавиатуру
+    if day != today and _all_finished(matches):
+        logger.info("День %s закрыт и не today — пропускаем апдейты", day)
+        return
+
+    logger.info("Поллер: обновляем %s сообщений для дня %s", len(states), day)
+
+    for state in states:
+        excluded = state.excluded_tournaments or set()
+        filtered_matches = (
+            [m for m in matches if m.tournament not in excluded]
+            if excluded else matches
+        )
+
+        core = build_core_text(filtered_matches, day)
+        new_text = make_full_text(core, now_msk)
+
+        keyboard = build_main_keyboard(
+            filtered_matches=filtered_matches,
+            all_matches=matches,
+            excluded=excluded,
+        )
+
+        old_core = extract_core(state.last_text)
+
+        # --- core не изменился ---
+        if old_core == core:
+            # Для today можно пинать клавиатуру (напоминания “тик-тик” меняются).
+            # Для вчерашнего (когда ещё не всё finished) — тоже можно, если хочешь.
+            try:
+                await bot.edit_message_reply_markup(
+                    chat_id=state.chat_id,
+                    message_id=state.message_id,
+                    reply_markup=keyboard,
+                )
+            except TelegramBadRequest as e:
+                msg = str(e)
+                # ✅ это не ошибка — просто ничего не поменялось
+                if "message is not modified" in msg:
+                    continue
+
+                logger.warning(
+                    "Не удалось обновить клавиатуру в чате %s (day=%s): %s",
+                    state.chat_id, day, e,
+                )
+                if "message to edit not found" in msg:
+                    try:
+                        delete_today_state(state.chat_id, day)
+                    except Exception as e2:
+                        logger.warning(
+                            "Ошибка при удалении today-состояния %s (day=%s): %s",
+                            state.chat_id, day, e2,
+                        )
+            except Exception as e:
+                logger.warning(
+                    "Не удалось обновить клавиатуру в чате %s (day=%s): %s",
+                    state.chat_id, day, e,
+                )
+            continue
+
+        # --- core изменился — редактируем текст + клаву ---
+        try:
+            await bot.edit_message_text(
+                chat_id=state.chat_id,
+                message_id=state.message_id,
+                text=new_text,
+                parse_mode="HTML",
+                reply_markup=keyboard,
+                disable_web_page_preview=True,
+            )
+            state.last_text = new_text
+            upsert_today_state(state)
+
+        except TelegramBadRequest as e:
+            msg = str(e)
+            logger.warning(
+                "Не удалось обновить today-сообщение в чате %s (day=%s): %s",
+                state.chat_id, day, e,
+            )
+            if "message to edit not found" in msg:
+                try:
+                    delete_today_state(state.chat_id, day)
+                except Exception as e2:
+                    logger.warning(
+                        "Ошибка при удалении today-состояния %s (day=%s): %s",
+                        state.chat_id, day, e2,
+                    )
+        except Exception as e:
+            logger.warning(
+                "Не удалось обновить today-сообщение в чате %s (day=%s): %s",
+                state.chat_id, day, e,
+            )
+
+
+
+
 async def poll_matches(bot: Bot) -> None:
-    """
-    Фоновый поллер:
-    - периодически обновляет матчи на сегодня
-    - обновляет today-сообщения во всех чатах
-    - если сообщение в Телеге уже удалено, очищает состояние, чтобы не дёргать его дальше
-    """
     logger.info("Старт фонового поллера матчей")
 
     while True:
         try:
-            await asyncio.sleep(60)
+            await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
-            day = datetime.now(MSK_TZ).date()
-            logger.info("Поллер: обновляем матчи для дня %s", day)
+            today = datetime.now(MSK_TZ).date()
+            yesterday = today - timedelta(days=1)
 
-            # 1. Тянем матчи из API
-            matches = await fetch_matches_for_day(day)
-            logger.info("Поллер: из API получено матчей: %s", len(matches))
+            # --- TODAY: всегда ---
+            today_matches = await fetch_matches_for_day(today)
+            await _update_today_states_for_day(bot, today, today_matches)
 
-            # 2. Берём все today-состояния на этот день
-            states = get_all_today_states_for_day(day)
-            logger.info("Для дня %s найдено today-состояний: %s", day, len(states))
+            # --- YESTERDAY: пока это реально "вчера" и есть сообщения в БД ---
+            y_states = get_all_today_states_for_day(yesterday)
+            if y_states:
+                y_matches = await fetch_matches_for_day(yesterday)
 
-            for state in states:
-                excluded = state.excluded_tournaments or set()
+                # ✅ Важно: не делаем "if all_finished: skip"
+                # потому что иначе финальный апдейт (live -> finished) может не попасть.
+                await _update_today_states_for_day(bot, yesterday, y_matches)
 
-                # 3. Применяем фильтры турниров
-                if excluded:
-                    filtered_matches = [
-                        m for m in matches if m.tournament not in excluded
-                    ]
-                else:
-                    filtered_matches = matches
-
-                now_msk = datetime.now(MSK_TZ)
-                core = build_core_text(filtered_matches, day)
-                new_text = make_full_text(core, now_msk)
-
-                # 4. Клавиатура: фильтры + напоминания по будущим матчам
-                keyboard = build_main_keyboard(
-                    filtered_matches=filtered_matches,
-                    all_matches=matches,
-                    excluded=excluded,
-                )
-
-                # 4а. Если текст не изменился — обновляем только клавиатуру
-                if state.last_text == new_text:
+                if _all_finished(y_matches):
                     logger.info(
-                        "Чат %s / день %s: текст не изменился, обновляем только клавиатуру",
-                        state.chat_id,
-                        day,
-                    )
-                    try:
-                        await bot.edit_message_reply_markup(
-                            chat_id=state.chat_id,
-                            message_id=state.message_id,
-                            reply_markup=keyboard,
-                        )
-                    except TelegramBadRequest as e:
-                        logger.warning(
-                            "Не удалось обновить клавиатуру today-сообщения в чате %s: %s",
-                            state.chat_id,
-                            e,
-                        )
-                        # Если сообщения больше нет — чистим состояние, чтобы не спамить лог
-                        if "message to edit not found" in str(e):
-                            if "delete_today_state" in globals():
-                                try:
-                                    delete_today_state(state.chat_id, day)
-                                except Exception as e2:
-                                    logger.warning(
-                                        "Ошибка при удалении today-состояния для чата %s: %s",
-                                        state.chat_id,
-                                        e2,
-                                    )
-                    except Exception as e:
-                        logger.warning(
-                            "Не удалось обновить клавиатуру today-сообщения в чате %s: %s",
-                            state.chat_id,
-                            e,
-                        )
-                    continue
-
-                # 4б. Текст изменился — обновляем и текст, и клавиатуру
-                try:
-                    await bot.edit_message_text(
-                        chat_id=state.chat_id,
-                        message_id=state.message_id,
-                        text=new_text,
-                        parse_mode="HTML",
-                        reply_markup=keyboard,
-                        disable_web_page_preview=True,
-                    )
-                    logger.info(
-                        "Поллер: обновили today-сообщение в чате %s (message_id=%s, day=%s)",
-                        state.chat_id,
-                        state.message_id,
-                        day,
-                    )
-                    state.last_text = new_text
-                    upsert_today_state(state)
-                    logger.info(
-                        "Состояние today-сообщения сохранено: chat_id=%s, day=%s, message_id=%s",
-                        state.chat_id,
-                        state.day,
-                        state.message_id,
-                    )
-
-                except TelegramBadRequest as e:
-                    logger.warning(
-                        "Не удалось обновить today-сообщение в чате %s: %s",
-                        state.chat_id,
-                        e,
-                    )
-                    # Сообщение удалено / недоступно — чистим состояние
-                    if "message to edit not found" in str(e):
-                        if "delete_today_state" in globals():
-                            try:
-                                delete_today_state(state.chat_id, day)
-                            except Exception as e2:
-                                logger.warning(
-                                    "Ошибка при удалении today-состояния для чата %s: %s",
-                                    state.chat_id,
-                                    e2,
-                                )
-
-                except Exception as e:
-                    logger.warning(
-                        "Не удалось обновить today-сообщение в чате %s: %s",
-                        state.chat_id,
-                        e,
+                        "Поллер: yesterday=%s уже закрыт (все finished). "
+                        "Дальше текст трогать не будем, т.к. core стабилен.",
+                        yesterday,
                     )
 
         except asyncio.CancelledError:

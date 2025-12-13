@@ -701,14 +701,14 @@ def normalize_match(m: Match) -> Match:
         m.score = None
         # если у нас "finished", но счёта нет — тоже подозрительно
         if m.status == "finished":
-            m.status = "unknown"
+            m.status = None
         return m
 
     left, right = score_tuple
 
     # 2а. Жёстко отсекаем finished + 0:0, даже если не знаем Bo
     if m.status == "finished" and left == 0 and right == 0:
-        m.status = "unknown"
+        m.status = None
         m.score = None
         return m
 
@@ -817,6 +817,7 @@ def parse_matches_from_html(html: str) -> List[Match]:
         tournament = tournament_el.get_text(strip=True) if tournament_el else None
 
         # --- Статус ---
+        # --- Статус ---
         status: Optional[str] = None
         status_el = container.select_one(".match-status")
         if status_el:
@@ -828,33 +829,36 @@ def parse_matches_from_html(html: str) -> List[Match]:
             elif "completed" in txt or "finished" in txt:
                 status = "finished"
             else:
-                status = "unknown"
+                status = None  # <-- было "unknown"
+        else:
+            status = None  # <-- было None/unknown; фиксируем явно
 
-        # --- URL матча ---
-        match_page_link = container.select_one(".match-page-button a")
+
+
+        # --- URL матча (канонический, без action=edit&redlink=1) ---
         match_url: Optional[str] = None
 
+        # пытаемся вытащить Match:ID из кнопки матча
+        match_page_link = container.select_one(".match-page-button a")
+        combined = ""
         if match_page_link:
             href = match_page_link.get("href") or ""
             title_attr = match_page_link.get("title") or ""
-
-            raw_url: Optional[str] = None
-            if href:
-                if href.startswith("http"):
-                    raw_url = href
-                else:
-                    raw_url = urljoin(BASE_URL, href)
-
-            match_url = raw_url
-
             combined = " ".join([href, title_attr])
-            m = re.search(r"Match:(ID_[^ \t&#/?]+)", combined)
-            if m:
-                liqui_id = m.group(1)
-                if match_url and "Match:ID_" not in match_url and liqui_id not in match_url:
-                    match_url = f"{match_url}#Match:{liqui_id}"
-                elif not match_url:
-                    match_url = urljoin(BASE_URL, f"/dota2/Match:{liqui_id}")
+
+        # если в кнопке нет ID — пробуем вытащить из текста всего контейнера
+        m_id = re.search(r"Match:(ID_[^ \t&#/?]+)", combined)
+        if not m_id:
+            text_block = " ".join(container.stripped_strings)
+            m_id = re.search(r"Match:(ID_[^ \t&#/?]+)", text_block)
+
+        # если нашли ID — строим канонический URL
+        if m_id:
+            liqui_id = m_id.group(1)
+            match_url = urljoin(BASE_URL, f"/dota2/index.php?title=Match:{liqui_id}")
+        else:
+            match_url = None
+
 
         m_obj = Match(
             time_msk=time_msk,
@@ -1254,8 +1258,11 @@ def _save_matches_to_db_impl(matches: List[Match]) -> None:
                         team1          = COALESCE(EXCLUDED.team1, dota_matches.team1),
                         team2          = COALESCE(EXCLUDED.team2, dota_matches.team2),
                         tournament     = COALESCE(EXCLUDED.tournament, dota_matches.tournament),
-                        status         = COALESCE(EXCLUDED.status, dota_matches.status),
-                        match_url      = COALESCE(EXCLUDED.match_url, dota_matches.match_url),
+                        status = CASE
+                            WHEN EXCLUDED.status IS NULL THEN dota_matches.status
+                            WHEN EXCLUDED.status = 'unknown' THEN dota_matches.status
+                            ELSE EXCLUDED.status
+                        END,                        match_url      = COALESCE(EXCLUDED.match_url, dota_matches.match_url),
                         updated_at     = now();
                                         """,
                     {
@@ -1266,7 +1273,7 @@ def _save_matches_to_db_impl(matches: List[Match]) -> None:
                         "score": m.score,
                         "bo": bo_int,
                         "tournament": m.tournament,
-                        "status": m.status or "unknown",
+                        "status": m.status,
                         "match_uid": match_uid,
                         "match_url": m.match_url,
                     },
@@ -1277,9 +1284,82 @@ def _save_matches_to_db_impl(matches: List[Match]) -> None:
     print(f"Сохранили/обновили {len(matches)} матчей в БД")
 
 
+
 # ---------------------------------------------------------------------------
 # ОБНОВЛЕНИЕ СЧЁТА МАТЧЕЙ
 # ---------------------------------------------------------------------------
+
+def extract_liquipedia_id_from_url(url: Optional[str]) -> Optional[str]:
+    if not url:
+        return None
+    m = re.search(r"Match:(ID_[^&#/?]+)", url)
+    return m.group(1) if m else None
+
+
+def fetch_score_from_completed_by_id(liqui_id: str) -> tuple[Optional[str], Optional[str]]:
+    """
+    Ищем матч во вкладке Completed по liquipedia Match ID (ID_xxx).
+    Возвращаем (score, bo_text).
+    """
+    url = MATCHES_URL + "?status=completed"
+
+    try:
+        html = fetch_html(url)
+    except Exception as e:
+        log_event({"level": "error", "msg": "fetch_completed_failed", "error": str(e)})
+        return None, None
+
+    soup = BeautifulSoup(html, "html.parser")
+    containers = soup.select(".match-info")
+    if not containers:
+        return None, None
+
+    for c in containers:
+        # Пытаемся найти Match:ID_... где угодно внутри контейнера
+        text_block = " ".join(c.stripped_strings)
+        m = re.search(r"Match:(ID_[^ \t&#/?]+)", text_block)
+        if not m:
+            # иногда ID встречается в href/title
+            m = re.search(r"Match:(ID_[^ \t&#/?]+)", str(c))
+        if not m:
+            continue
+
+        cid = m.group(1)
+        if cid != liqui_id:
+            continue
+
+        # Нашли нужный матч — берём score/bo
+        score, bo_text = None, None
+
+        score_el = c.select_one(".match-info-header-scoreholder-scorewrapper")
+        if score_el:
+            upper = score_el.select_one(".match-info-header-scoreholder-upper")
+            lower = score_el.select_one(".match-info-header-scoreholder-lower")
+
+            if upper:
+                raw = upper.get_text(strip=True)
+                mm = re.match(r"^(\d+)\s*[:\-]\s*(\d+)$", raw)
+                if mm:
+                    a, b = int(mm.group(1)), int(mm.group(2))
+                    if 0 <= a <= 10 and 0 <= b <= 10:
+                        score = f"{a}:{b}"
+
+            if lower:
+                bo_text = lower.get_text(strip=True) or None
+
+        # fallback: если верстка странная — берём “универсальным” парсером
+        if not score or not bo_text:
+            f_score, f_bo = parse_score_and_bo_from_container(c)
+            if not score and f_score:
+                score = f_score
+            if not bo_text and f_bo:
+                bo_text = f_bo
+
+        return score, bo_text
+
+    return None, None
+
+
 
 def _parse_score_block_from_soup(soup: BeautifulSoup) -> Tuple[Optional[str], Optional[str]]:
     """
@@ -1307,103 +1387,174 @@ def _parse_score_block_from_soup(soup: BeautifulSoup) -> Tuple[Optional[str], Op
     return score, bo_text
 
 
-def fetch_score_from_match_page(match_url: str) -> Tuple[Optional[str], Optional[str]]:
+def fetch_score_from_matches_by_id(liqui_id: str, url: str) -> tuple[Optional[str], Optional[str]]:
     """
-    Пытаемся вытащить счёт **с самой страницы матча**.
+    Ищем матч по liquipedia Match ID (ID_xxx) на странице url
+    (MATCHES_URL или MATCHES_URL?status=completed).
+    Возвращаем (score, bo_text).
+
+    Эта версия строит индекс ID->контейнер и логирует диагностическую инфу,
+    если нужного ID не найдено.
     """
     try:
-        html = fetch_html(match_url)
+        html = fetch_html(url)
     except Exception as e:
-        log_event(
-            {
-                "level": "error",
-                "msg": "fetch_score_from_match_page_failed",
-                "match_url": match_url,
-                "error": str(e),
-            }
+        log_event({"level": "error", "msg": "fetch_matches_by_id_failed", "url": url, "error": str(e)})
+        return None, None
+
+    soup = BeautifulSoup(html, "html.parser")
+    containers = soup.select(".match-info")
+    if not containers:
+        logger.info("[SCORE_ID] no .match-info on %s", url)
+        return None, None
+
+    ID_RE = re.compile(r"(ID_[A-Za-z0-9]+(?:_[0-9A-Za-z\-]+)*)")
+
+    def _extract_ids_from_container(c: Tag) -> list[str]:
+        ids: list[str] = []
+
+        # 1) смотрим кнопку матча
+        a_btn = c.select_one(".match-page-button a")
+        if a_btn:
+            combined = f"{a_btn.get('href','')} {a_btn.get('title','')}"
+            ids += ID_RE.findall(combined)
+
+        # 2) смотрим все ссылки внутри
+        for a in c.find_all("a", href=True):
+            combined = f"{a.get('href','')} {a.get('title','')}"
+            ids += ID_RE.findall(combined)
+
+        # 3) fallback по сырому html контейнера
+        ids += ID_RE.findall(str(c))
+
+        # уникализируем сохранив порядок
+        seen = set()
+        out = []
+        for x in ids:
+            if x not in seen:
+                seen.add(x)
+                out.append(x)
+        return out
+
+    # строим индекс id -> container
+    index: dict[str, Tag] = {}
+    for c in containers:
+        for cid in _extract_ids_from_container(c):
+            # берём первый найденный контейнер для id
+            if cid not in index:
+                index[cid] = c
+
+    if liqui_id not in index:
+        # диагностика: покажем, какие ID вообще видим на странице
+        sample = list(index.keys())[:10]
+        logger.info(
+            "[SCORE_ID] id not found on page. target=%s url=%s containers=%d indexed_ids=%d sample=%s",
+            liqui_id, url, len(containers), len(index), sample
         )
+        return None, None
+
+    c = index[liqui_id]
+
+    # парсим score/bo
+    score: Optional[str] = None
+    bo_text: Optional[str] = None
+
+    score_el = c.select_one(".match-info-header-scoreholder-scorewrapper")
+    if score_el:
+        upper = score_el.select_one(".match-info-header-scoreholder-upper")
+        lower = score_el.select_one(".match-info-header-scoreholder-lower")
+
+        if upper:
+            raw = upper.get_text(strip=True)
+            mm = re.match(r"^(\d+)\s*[:\-]\s*(\d+)$", raw)
+            if mm:
+                a, b = int(mm.group(1)), int(mm.group(2))
+                if 0 <= a <= 10 and 0 <= b <= 10:
+                    score = f"{a}:{b}"
+
+        if lower:
+            bo_text = lower.get_text(strip=True) or None
+
+    if not score or not bo_text:
+        f_score, f_bo = parse_score_and_bo_from_container(c)
+        if not score and f_score:
+            score = f_score
+        if not bo_text and f_bo:
+            bo_text = f_bo
+
+    logger.info("[SCORE_ID] found target=%s url=%s score=%s bo=%s", liqui_id, url, score, bo_text)
+    return score, bo_text
+
+
+def fetch_score_from_match_page(match_url: str) -> Tuple[Optional[str], Optional[str]]:
+    try:
+        html = fetch_html(match_url)
+    except requests .HTTPError as e:
+        if getattr(e, "response", None) is not None and e.response.status_code == 404:
+            # страницы матча не существует — это норма
+            logger.info("Match page not found (404), skip: %s", match_url)
+            return None, None
+        log_event({"level":"error","msg":"fetch_score_from_match_page_failed","match_url":match_url,"error":str(e)})
+        return None, None
+    except Exception as e:
+        log_event({"level":"error","msg":"fetch_score_from_match_page_failed","match_url":match_url,"error":str(e)})
         return None, None
 
     soup = BeautifulSoup(html, "html.parser")
     return _parse_score_block_from_soup(soup)
 
 
-def fetch_score_from_main_completed(team1: str, team2: str, tournament_clean: str) -> Optional[str]:
-    """
-    Фоллбек: ищем матч во вкладке Completed на Liquipedia:Matches и вытаскиваем оттуда счёт.
-    Логика максимально простая и может потребовать подстройки под реальную верстку.
-    """
-    # Пробуем открыть Completed-страницу. Если когда-нибудь поменяешь URL/параметры — поправим тут.
-    url = MATCHES_URL + "?status=completed"
 
+def fetch_score_from_main_completed(team1: str, team2: str, tournament_clean: str) -> Optional[str]:
+    url = MATCHES_URL + "?status=completed"
     try:
         html = fetch_html(url)
-        matches = parse_matches_from_html(html)
-
-        print(f"[DEBUG] parse_matches_from_html вернул матчей: {len(matches)}")
     except Exception as e:
-        log_event(
-            {
-                "level": "error",
-                "msg": "fetch_score_from_main_completed_failed",
-                "error": str(e),
-            }
-        )
+        log_event({"level":"error","msg":"fetch_score_from_main_completed_failed","error":str(e)})
         return None
 
-    soup = BeautifulSoup(html, "html.parser")
-    containers = soup.select(".matches-row, .infobox_matches_content")
+    matches = parse_matches_from_html(html)
 
     team1_norm = team1.strip().lower()
     team2_norm = team2.strip().lower()
     tournament_norm = tournament_clean.strip().lower()
 
-    for c in containers:
-        teams = c.select(
-            ".team-template-text a, .team-template-image-icon + span.name a"
-        )
-        t1 = (
-            normalize_team_name(extract_team_name_from_tag(teams[0])).lower()
-            if len(teams) >= 1
-            else ""
-        )
-        t2 = (
-            normalize_team_name(extract_team_name_from_tag(teams[1])).lower()
-            if len(teams) >= 2
-            else ""
-        )
-
-        if not (t1 == team1_norm and t2 == team2_norm):
+    for m in matches:
+        if not m.team1 or not m.team2:
+            continue
+        if m.team1.strip().lower() != team1_norm:
+            continue
+        if m.team2.strip().lower() != team2_norm:
             continue
 
-        t_el = c.select_one(".match-info-tournament a span")
-        t_name = t_el.get_text(strip=True).lower() if t_el else ""
-        t_clean = clean_tournament_name(t_name).lower()
-
-        if tournament_norm and tournament_norm not in t_clean:
+        t = clean_tournament_name(m.tournament or "").strip().lower()
+        if tournament_norm and tournament_norm not in t:
             continue
 
-        score, _ = _parse_score_block_from_soup(c)
-        if score:
-            print(
-                f"[SCORE_MAIN] Нашли счёт в completed_html: {team1} vs {team2} -> {score}"
-            )
-            return score
+        if m.score:
+            print(f"[SCORE_MAIN] Нашли счёт в completed: {team1} vs {team2} -> {m.score}")
+            return m.score
 
     return None
 
 
 def update_scores_from_match_pages() -> None:
-    """
-    Проходим по матчам в БД, у которых:
-      - статус live/upcoming,
-      - время матча уже прошло,
-      - нет счёта,
-    и пытаемся добить им score:
-      1) сначала со страницы матча (match_url),
-      2) потом — из вкладки Completed.
-    """
-    now_msk = datetime.now(MSK_TZ)
+    def _parse_score_tuple(score_str: str) -> Optional[tuple[int, int]]:
+        try:
+            a_str, b_str = score_str.strip().split(":")
+            return int(a_str), int(b_str)
+        except Exception:
+            return None
+
+    def _is_final_score(score_str: str, bo_value: Optional[int]) -> bool:
+        if not bo_value or bo_value <= 0:
+            return False
+        st = _parse_score_tuple(score_str)
+        if not st:
+            return False
+        a, b = st
+        needed = bo_value // 2 + 1
+        return max(a, b) >= needed
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -1411,19 +1562,16 @@ def update_scores_from_match_pages() -> None:
                 """
                 SELECT
                     id,
-                    team1,
-                    team2,
-                    tournament,
-                    match_time_msk,
                     match_url,
+                    liquipedia_match_id,
                     score,
-                    status
+                    status,
+                    bo
                 FROM dota_matches
                 WHERE
                     (status = 'live' OR status = 'upcoming' OR status IS NULL)
                     AND match_time_msk IS NOT NULL
                     AND match_time_msk < (now() AT TIME ZONE 'Europe/Moscow') - INTERVAL '10 minutes'
-                    AND (score IS NULL OR score = '')
                 ORDER BY match_time_msk
                 LIMIT 200;
                 """
@@ -1436,76 +1584,81 @@ def update_scores_from_match_pages() -> None:
 
             print(f"[SCORE] Обновляем счёт для {len(rows)} матчей")
 
-            for row in rows:
-                (
-                    match_id,
-                    team1,
-                    team2,
-                    tournament,
-                    match_time_msk,
-                    match_url,
-                    score,
-                    status,
-                ) = row
-
-                if score:
+            for (match_id, match_url, liqui_id_db, score_db, status_db, bo_db) in rows:
+                # если уже финальный — пропускаем
+                if score_db and bo_db and _is_final_score(score_db, bo_db):
                     continue
 
-                tournament_clean = clean_tournament_name(tournament or "")
-
-                new_score: Optional[str] = None
-                new_bo: Optional[int] = None
-
-                # 1. пробуем по match_url
-                if match_url:
-                    s, bo_text = fetch_score_from_match_page(match_url)
-                    if s:
-                        new_score = s
-                    if bo_text:
-                        new_bo = parse_bo_int(bo_text)
-
-                # 2. если не нашли, можем попробовать Completed
-                if not new_score and team1 and team2 and tournament_clean:
-                    s = fetch_score_from_main_completed(team1, team2, tournament_clean)
-                    if s:
-                        new_score = s
-
-                if not new_score:
-                    # не нашли — просто отмечаем, что проверяли
+                liqui_id = (liqui_id_db or "").strip() or extract_liquipedia_id_from_url(match_url)
+                if not liqui_id:
                     cur.execute(
-                        """
-                        UPDATE dota_matches
-                        SET last_score_check_at = now()
-                        WHERE id = %(id)s;
-                        """,
+                        "UPDATE dota_matches SET last_score_check_at = now() WHERE id = %(id)s;",
                         {"id": match_id},
                     )
                     continue
 
-                # обновляем матч в БД
+                logger.info("[SCORE_ID] try match_id=%s liqui_id=%s", match_id, liqui_id)
+
+                new_score: Optional[str] = None
+                new_bo: Optional[int] = None
+
+                # 1) matches (live/finished)
+                s, bo_text = fetch_score_from_matches_by_id(liqui_id, MATCHES_URL)
+                if s:
+                    new_score = s
+                if bo_text:
+                    new_bo = parse_bo_int(bo_text)
+
+                # 2) completed
+                if not new_score:
+                    s, bo_text = fetch_score_from_matches_by_id(liqui_id, MATCHES_URL + "?status=completed")
+                    if s:
+                        new_score = s
+                    if bo_text and new_bo is None:
+                        new_bo = parse_bo_int(bo_text)
+
+                # 3) match page (optional)
+                if not new_score and match_url:
+                    s, bo_text = fetch_score_from_match_page(match_url)
+                    if s:
+                        new_score = s
+                    if bo_text and new_bo is None:
+                        new_bo = parse_bo_int(bo_text)
+
+                if not new_score:
+                    cur.execute(
+                        "UPDATE dota_matches SET last_score_check_at = now() WHERE id = %(id)s;",
+                        {"id": match_id},
+                    )
+                    continue
+
+                bo_effective = new_bo if new_bo is not None else bo_db
+                is_final = _is_final_score(new_score, bo_effective)
+                new_status = "finished" if is_final else "live"
+
                 cur.execute(
                     """
                     UPDATE dota_matches
                     SET
                         score = %(score)s,
                         bo = COALESCE(%(bo)s, bo),
-                        status = 'finished',
+                        status = %(status)s,
                         last_score_check_at = now(),
                         score_last_updated_at = now(),
                         updated_at = now()
                     WHERE id = %(id)s;
                     """,
-                    {
-                        "id": match_id,
-                        "score": new_score,
-                        "bo": new_bo,
-                    },
+                    {"id": match_id, "score": new_score, "bo": new_bo, "status": new_status},
+                )
+
+                logger.info(
+                    "[SCORE_DB] updated id=%s rowcount=%s score=%s bo=%s status=%s",
+                    match_id, cur.rowcount, new_score, new_bo, new_status
                 )
 
         conn.commit()
 
     print("[SCORE] Обновление счёта завершено")
-
 
 # ---------------------------------------------------------------------------
 # ОБНОВЛЕНИЕ СТАТУСОВ МАТЧЕЙ ПО ВРЕМЕНИ
@@ -1513,9 +1666,8 @@ def update_scores_from_match_pages() -> None:
 
 def refresh_statuses_in_db() -> None:
     """
-    Обновляем status матчей по времени.
-    Важно: не ломаем constraint finished_must_have_score —
-    поэтому 'finished' ставим только там, где score IS NOT NULL.
+    Обновляем status матчей по времени и данным в БД.
+    finished ставим ТОЛЬКО если счёт финальный относительно bo.
     """
     with get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -1524,12 +1676,27 @@ def refresh_statuses_in_db() -> None:
                 UPDATE dota_matches
                 SET
                     status = CASE
-                        WHEN score IS NOT NULL THEN 'finished'
-                        WHEN match_time_msk > now() AT TIME ZONE 'Europe/Moscow' + INTERVAL '5 minutes'
-                            THEN 'upcoming'
-                        WHEN match_time_msk < now() AT TIME ZONE 'Europe/Moscow' - INTERVAL '4 hours'
-                             AND score IS NULL
-                            THEN 'live'
+                        -- 1) финализация по bo+score
+                        WHEN bo IS NOT NULL
+                             AND score IS NOT NULL AND score <> ''
+                             AND score ~ '^[0-9]+:[0-9]+$'
+                             AND GREATEST(
+                                 split_part(score, ':', 1)::int,
+                                 split_part(score, ':', 2)::int
+                             ) >= ((bo / 2)::int + 1)
+                        THEN 'finished'
+
+                        -- 2) ещё не начался
+                        WHEN match_time_msk > now() + INTERVAL '5 minutes'
+                        THEN 'upcoming'
+
+                        -- 3) должен идти (в пределах 4 часов)
+                        WHEN match_time_msk <= now() - INTERVAL '5 minutes'
+                             AND match_time_msk >= now() - INTERVAL '4 hours'
+                             AND (status IS NULL OR status IN ('unknown', 'upcoming'))
+                        THEN 'live'
+
+                        -- иначе не трогаем
                         ELSE status
                     END,
                     updated_at = now()
@@ -1538,7 +1705,8 @@ def refresh_statuses_in_db() -> None:
             )
         conn.commit()
 
-    print("Статусы матчей обновлены по времени")
+    print("Статусы матчей обновлены по времени/BO")
+
 
 
 # ---------------------------------------------------------------------------

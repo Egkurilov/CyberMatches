@@ -67,13 +67,11 @@ class DatabasePool:
         Гарантирует, что у нас есть живое соединение.
         Если коннект отсутствует или закрыт — создаём новый.
         """
-        # psycopg3: .closed -> True/False (или 0/1)
         if self._pool is None or getattr(self._pool, "closed", False):
             if self._pool is not None:
                 try:
                     await self._pool.close()
                 except Exception:
-                    # если оно уже мёртвое — ну и ладно
                     pass
 
             logger.warning("Соединение с БД отсутствует или закрыто, пробуем переподключиться...")
@@ -96,7 +94,6 @@ class DatabasePool:
             async with self._pool.cursor() as cur:
                 yield cur
         except (psycopg.OperationalError, psycopg.InterfaceError) as e:
-            # Типичная история: "the connection is closed", "server closed the connection" и т.п.
             logger.error(f"Ошибка работы с БД (соединение будет пересоздано): {e}")
             try:
                 if self._pool and not getattr(self._pool, "closed", False):
@@ -104,10 +101,7 @@ class DatabasePool:
             except Exception:
                 pass
 
-            # помечаем текущее соединение как сломанное — следующее обращение создаст новое
             self._pool = None
-            # Пробрасываем исключение наверх — конкретный запрос всё равно не удался,
-            # но следующий уже будет на свежем соединении
             raise
 
     async def close_pool(self):
@@ -121,8 +115,6 @@ class DatabasePool:
 
 # Создание глобального экземпляра пула
 db_pool = DatabasePool()
-
-# Синхронное соединение для вспомогательных запросов (например, получения URL команды)
 
 # ---------- Кэширование и оптимизация ----------
 
@@ -146,11 +138,9 @@ def extract_liquipedia_id(match_uid: Optional[str], match_url: Optional[str]) ->
     if not match_uid and not match_url:
         return None
 
-    # вариант 1: новый формат match_uid = "lp:ID_..."
     if match_uid and match_uid.startswith("lp:"):
         return match_uid[3:]
 
-    # вариант 2: достаём прямо из URL
     if match_url:
         m1 = re.search(r"Match:(ID_[^&#/?]+)", match_url)
         if m1:
@@ -162,18 +152,11 @@ def extract_liquipedia_id(match_uid: Optional[str], match_url: Optional[str]) ->
     return None
 
 
-# ---------- Бизнес-логика ----------
+# ---------- DOTA2: бизнес-логика ----------
 
 async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
     """
     Асинхронно получает список матчей на указанную дату (по МСК).
-
-    Делает:
-      - вытаскивание liquipedia_match_id из match_uid / match_url при необходимости;
-      - дедупликацию матчей (по Liquipedia ID или fallback-ключу);
-      - фильтрацию мусорных TBD-плейсхолдеров:
-          если в том же турнире и в то же время есть матч с нормальными командами,
-          то TBD-версия скрывается.
     """
     tz_msk = _get_timezone_msk()
 
@@ -191,7 +174,7 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
                 liquipedia_match_id,
                 match_uid,
                 match_url
-            FROM dota_matches 
+            FROM dota_matches
             WHERE (match_time_msk AT TIME ZONE 'Europe/Moscow')::date = %s
             ORDER BY match_time_msk;
             """,
@@ -199,7 +182,6 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
         )
         rows = await cur.fetchall()
 
-    # Собираем все уникальные названия команд для batch загрузки
     all_team_names = []
     for row in rows:
         team1 = row[1]
@@ -209,7 +191,6 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
         if team2:
             all_team_names.append(team2)
 
-    # Batch загрузка URL команд (1 запрос вместо N)
     team_urls = await get_team_urls_batch(all_team_names)
 
     matches_by_key: Dict[Any, Dict[str, Any]] = {}
@@ -228,15 +209,12 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
             match_url,
         ) = row
 
-        # приводим время к МСК и к таймзоне
         if match_time_msk.tzinfo is None:
             match_time_msk = match_time_msk.replace(tzinfo=timezone.utc).astimezone(tz_msk)
         else:
             match_time_msk = match_time_msk.astimezone(tz_msk)
 
-        # вытаскиваем Liquipedia ID из БД / match_uid / match_url
         liquipedia_id = liqui_in_db or extract_liquipedia_id(match_uid, match_url)
-
 
         match_dict: Dict[str, Any] = {
             "match_time_msk": match_time_msk.isoformat(),
@@ -252,12 +230,9 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
             "liquipedia_match_id": liquipedia_id,
         }
 
-        # --- ключ для дедупликации ---
         if liquipedia_id:
-            # если есть нормальный Liquipedia ID — доверяем ему
             key = ("id", liquipedia_id)
         else:
-            # fallback: по слоту и парам команд
             key = (
                 "fallback",
                 match_time_msk.isoformat(),
@@ -271,9 +246,6 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
         if existing is None:
             matches_by_key[key] = match_dict
         else:
-            # выбираем "лучший" матч:
-            # 1) у кого есть нормальный score (не None и не "0:0")
-            # 2) если одинаково — у кого есть bo
             def score_weight(s: Optional[str]) -> int:
                 if not s or s == "0:0":
                     return 0
@@ -290,12 +262,8 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
                 if new_bo > cur_bo:
                     matches_by_key[key] = match_dict
 
-    # --- превращаем в список ---
     matches = list(matches_by_key.values())
 
-    # --- фильтрация TBD-плейсхолдеров ---
-    # если в том же турнире и в то же время есть матч с нормальными командами,
-    # то матчи с TBD в этом слоте выкидываем.
     non_tbd_slots: set[tuple[str, str]] = set()
     for m in matches:
         if m["team1"] != "TBD" and m["team2"] != "TBD":
@@ -307,137 +275,11 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
             m["match_time_msk"],
             m["tournament"],
         ) in non_tbd_slots:
-            # есть нормальный матч в этом же слоте — TBD-версию выкидываем
             continue
         filtered_matches.append(m)
 
     logger.info(f"Получено {len(filtered_matches)} матчей для даты {target_date}")
     return filtered_matches
-
-
-async def get_matches_with_tournament_filter(
-        target_date: date,
-        tournament_ids: Optional[List[int]] = None
-) -> List[Dict[str, Any]]:
-    """
-    Получает матчи с возможной фильтрацией по турнирам.
-    Использует JOIN с таблицей tournaments для оптимизации.
-    Плюс:
-      - вытаскивает liquipedia_match_id;
-      - убирает дубли.
-    """
-    tz_msk = _get_timezone_msk()
-
-    query = """
-        SELECT
-            dm.match_time_msk,
-            dm.team1,
-            dm.team2,
-            dm.bo,
-            dm.tournament,
-            dm.status,
-            dm.score,
-            dm.liquipedia_match_id,
-            dm.match_uid,
-            dm.match_url
-        FROM dota_matches dm
-    """
-
-    params = [target_date]
-
-    if tournament_ids:
-        query += " JOIN tournaments t ON dm.tournament_id = t.id WHERE t.id = ANY(%s) AND"
-        params.append(tournament_ids)
-    else:
-        query += " WHERE"
-
-    query += " (dm.match_time_msk AT TIME ZONE 'Europe/Moscow')::date = %s ORDER BY dm.match_time_msk;"
-
-    async with db_pool.get_connection() as cur:
-        await cur.execute(query, params)
-        rows = await cur.fetchall()
-
-    # Собираем все уникальные названия команд для batch загрузки
-    all_team_names = []
-    for row in rows:
-        team1 = row[1]
-        team2 = row[2]
-        if team1:
-            all_team_names.append(team1)
-        if team2:
-            all_team_names.append(team2)
-
-    # Batch загрузка URL команд (1 запрос вместо N)
-    team_urls = await get_team_urls_batch(all_team_names)
-
-    matches_by_key: Dict[Any, Dict[str, Any]] = {}
-
-    for row in rows:
-        (
-            match_time_msk,
-            team1,
-            team2,
-            bo_int,
-            tournament,
-            status,
-            score,
-            liqui_in_db,
-            match_uid,
-            match_url,
-        ) = row
-
-        if match_time_msk.tzinfo is None:
-            match_time_msk = match_time_msk.replace(tzinfo=timezone.utc).astimezone(tz_msk)
-        else:
-            match_time_msk = match_time_msk.astimezone(tz_msk)
-
-        liquipedia_id = liqui_in_db or extract_liquipedia_id(match_uid, match_url)
-
-        match_dict = {
-            "liquipedia_match_id": liquipedia_id,
-            "team1": team1,
-            "team1_url": team_urls.get(team1) if team1 else None,
-            "team2": team2,
-            "team2_url": team_urls.get(team2) if team2 else None,
-            "bo": bo_int,
-            "tournament": tournament or "",
-            "status": status or "unknown",
-            "score": score,
-        }
-
-        if liquipedia_id:
-            key = ("id", liquipedia_id)
-        else:
-            key = (
-                "fallback",
-                match_time_msk.isoformat(),
-                (team1 or "").lower(),
-                (team2 or "").lower(),
-                (tournament or "").lower(),
-                bo_int or 0,
-            )
-
-        existing = matches_by_key.get(key)
-        if existing is None:
-            matches_by_key[key] = match_dict
-        else:
-            def score_weight(s: Optional[str]) -> int:
-                if not s or s == "0:0":
-                    return 0
-                return 1
-
-            cur_score = existing.get("score")
-            new_score = score
-
-            if score_weight(new_score) > score_weight(cur_score):
-                matches_by_key[key] = match_dict
-            elif score_weight(new_score) == score_weight(cur_score):
-                cur_bo = existing.get("bo") or 0
-                new_bo = bo_int or 0
-                if new_bo > cur_bo:
-                    matches_by_key[key] = match_dict
-
-    return list(matches_by_key.values())
 
 
 def get_team_url(conn, team_name: str) -> str | None:
@@ -466,13 +308,11 @@ async def get_team_urls_batch(team_names: List[str]) -> Dict[str, Optional[str]]
     if not team_names:
         return {}
 
-    # Убираем None и дубликаты, сохраняя оригинальный регистр
     unique_names = list(set(name for name in team_names if name))
     if not unique_names:
         return {}
 
     async with db_pool.get_connection() as cur:
-        # Используем ANY для запроса всех команд за раз
         await cur.execute(
             """
             SELECT name, liquipedia_url
@@ -483,50 +323,168 @@ async def get_team_urls_batch(team_names: List[str]) -> Dict[str, Optional[str]]
         )
         rows = await cur.fetchall()
 
-    # Строим case-insensitive lookup
     result = {name.lower(): None for name in unique_names}
     for row_name, row_url in rows:
         result[row_name.lower()] = row_url
 
-    # Маппим обратно на оригинальный регистр
     return {name: result.get(name.lower()) for name in team_names}
 
 
-# ---------- FastAPI-приложение с улучшениями ----------
+# ---------- CS2: бизнес-логика ----------
+
+async def get_cs2_team_urls_batch(team_names: List[str]) -> Dict[str, Optional[str]]:
+    """
+    Пакетная загрузка URL команд CS2 (HLTV) за один запрос.
+    Возвращает dict: {team_name: hltv_url or None}
+    """
+    if not team_names:
+        return {}
+
+    unique_names = list(set(name for name in team_names if name))
+    if not unique_names:
+        return {}
+
+    async with db_pool.get_connection() as cur:
+        await cur.execute(
+            """
+            SELECT name, hltv_url
+            FROM cs2_teams
+            WHERE LOWER(name) = ANY(%s);
+            """,
+            ([name.lower() for name in unique_names],),
+        )
+        rows = await cur.fetchall()
+
+    result = {name.lower(): None for name in unique_names}
+    for row_name, row_url in rows:
+        result[row_name.lower()] = row_url
+
+    return {name: result.get(name.lower()) for name in team_names}
+
+
+async def get_cs2_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
+    """
+    Асинхронно получает список CS2 матчей на указанную дату (по МСК)
+    из таблиц cs2_matches + cs2_events.
+
+    Важно: score в cs2_matches отсутствует -> отдаём null.
+    """
+    tz_msk = _get_timezone_msk()
+
+    async with db_pool.get_connection() as cur:
+        await cur.execute(
+            """
+            SELECT
+                m.match_id,
+                m.when_utc,
+                m.team1,
+                m.team2,
+                m.bo,
+                COALESCE(m.event_title, e.name) AS tournament,
+                m.status,
+                m.url
+            FROM cs2_matches m
+            LEFT JOIN cs2_events e ON e.event_id = m.event_id
+            WHERE (m.when_utc AT TIME ZONE 'Europe/Moscow')::date = %s
+            ORDER BY m.when_utc;
+            """,
+            (target_date,),
+        )
+        rows = await cur.fetchall()
+
+    all_team_names: List[str] = []
+    for row in rows:
+        team1 = row[2]
+        team2 = row[3]
+        if team1:
+            all_team_names.append(team1)
+        if team2:
+            all_team_names.append(team2)
+
+    team_urls = await get_cs2_team_urls_batch(all_team_names)
+
+    matches: List[Dict[str, Any]] = []
+    seen: set[int] = set()
+
+    for row in rows:
+        (
+            match_id,
+            when_utc,
+            team1,
+            team2,
+            bo_int,
+            tournament,
+            status,
+            match_url,
+        ) = row
+
+        if match_id in seen:
+            continue
+        seen.add(match_id)
+
+        if when_utc is None:
+            # На всякий случай: если дата пустая — пропускаем, иначе клиенту будет больно.
+            continue
+
+        if when_utc.tzinfo is None:
+            when_msk = when_utc.replace(tzinfo=timezone.utc).astimezone(tz_msk)
+        else:
+            when_msk = when_utc.astimezone(tz_msk)
+
+        matches.append(
+            {
+                "match_time_msk": when_msk.isoformat(),
+                "time_msk": when_msk.strftime("%H:%M"),
+                "team1": team1,
+                "team1_url": team_urls.get(team1) if team1 else None,
+                "team2": team2,
+                "team2_url": team_urls.get(team2) if team2 else None,
+                "bo": bo_int,
+                "tournament": tournament or "",
+                "status": status or "unknown",
+                "score": None,
+                # чтобы формат был “как у dota2”, кладём id сюда
+                "liquipedia_match_id": str(match_id),
+                # и нормальное поле тоже (не мешает, зато удобно)
+                "match_id": match_id,
+                "match_url": match_url,
+            }
+        )
+
+    logger.info(f"Получено {len(matches)} CS2 матчей для даты {target_date}")
+    return matches
+
+
+# ---------- FastAPI-приложение ----------
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Управление жизненным циклом приложения (startup/shutdown)."""
-    # startup
     logging.info("Startup: инициализация пула подключений к БД")
     await db_pool.init_pool()
-
-    yield  # <-- здесь приложение работает
-
-    # shutdown
+    yield
     logging.info("Shutdown: закрытие пула подключений к БД")
     await db_pool.close_pool()
 
 
 app = FastAPI(
     title="CyberMatches API",
-    description="Оптимизированный API для матчей Dota 2 из Liquipedia",
-    version="2.0.0",
+    description="Оптимизированный API для матчей Dota 2 из Liquipedia + CS2 из HLTV",
+    version="2.1.0",
     lifespan=lifespan,
 )
 
+# ---------- Dota2 endpoints ----------
 
 @app.get("/dota/matches/today")
 async def matches_today():
-    """
-    Асинхронно получает матчи на сегодня (по МСК).
-    """
+    """Асинхронно получает матчи на сегодня (по МСК)."""
     try:
         tz_msk = _get_timezone_msk()
         today_msk = datetime.now(tz_msk).date()
-        
+
         matches = await get_matches_for_date(today_msk)
-        
+
         return {
             "date": today_msk.strftime("%Y-%m-%d"),
             "timezone": "Europe/Moscow",
@@ -542,10 +500,7 @@ async def matches_today():
 
 @app.get("/dota/matches/{date_str}")
 async def matches_by_date(date_str: str):
-    """
-    Асинхронно получает матчи на произвольную дату (по МСК).
-    Формат даты: dd-mm-yyyy, например: 26-11-2025
-    """
+    """Асинхронно получает матчи на произвольную дату (по МСК). dd-mm-yyyy"""
     try:
         target_date = _format_date_cache(date_str)
     except ValueError:
@@ -556,7 +511,7 @@ async def matches_by_date(date_str: str):
 
     try:
         matches = await get_matches_for_date(target_date)
-        
+
         return {
             "date": target_date.strftime("%Y-%m-%d"),
             "timezone": "Europe/Moscow",
@@ -570,16 +525,69 @@ async def matches_by_date(date_str: str):
             detail="Внутренняя ошибка сервера при получении матчей"
         )
 
+
+# ---------- CS2 endpoints ----------
+
+@app.get("/cs2/matches/today")
+async def cs2_matches_today():
+    """Асинхронно получает CS2 матчи на сегодня (по МСК)."""
+    try:
+        tz_msk = _get_timezone_msk()
+        today_msk = datetime.now(tz_msk).date()
+
+        matches = await get_cs2_matches_for_date(today_msk)
+
+        return {
+            "date": today_msk.strftime("%Y-%m-%d"),
+            "timezone": "Europe/Moscow",
+            "matches": matches,
+            "total": len(matches),
+        }
+    except Exception as e:
+        logger.error(f"Ошибка при получении CS2 матчей на сегодня: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Внутренняя ошибка сервера при получении матчей"
+        )
+
+
+@app.get("/cs2/matches/{date_str}")
+async def cs2_matches_by_date(date_str: str):
+    """Асинхронно получает CS2 матчи на произвольную дату (по МСК). dd-mm-yyyy"""
+    try:
+        target_date = _format_date_cache(date_str)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Неверный формат даты. Используй dd-mm-yyyy, например: 26-11-2025",
+        )
+
+    try:
+        matches = await get_cs2_matches_for_date(target_date)
+
+        return {
+            "date": target_date.strftime("%Y-%m-%d"),
+            "timezone": "Europe/Moscow",
+            "matches": matches,
+            "total": len(matches),
+        }
+    except Exception as e:
+        logger.error(f"Ошибка при получении CS2 матчей на дату {date_str}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Внутренняя ошибка сервера при получении матчей"
+        )
+
+
+# ---------- Общие endpoints ----------
+
 @app.get("/dota/matches/stats")
 async def matches_stats():
-    """
-    Получает статистику по матчам (общее количество, количество по статусам и т.д.)
-    """
+    """Статистика по Dota матчам."""
     try:
         async with db_pool.get_connection() as cur:
-            # Общая статистика
             await cur.execute("""
-                SELECT 
+                SELECT
                     COUNT(*) as total,
                     COUNT(CASE WHEN status = 'upcoming' THEN 1 END) as upcoming,
                     COUNT(CASE WHEN status = 'live' THEN 1 END) as live,
@@ -587,8 +595,7 @@ async def matches_stats():
                 FROM dota_matches;
             """)
             total_stats = await cur.fetchone()
-            
-            # Статистика по турнирам
+
             await cur.execute("""
                 SELECT tournament, COUNT(*) as count
                 FROM dota_matches
@@ -597,10 +604,9 @@ async def matches_stats():
                 LIMIT 10;
             """)
             tournament_stats = await cur.fetchall()
-            
-            # Статистика по датам
+
             await cur.execute("""
-                SELECT 
+                SELECT
                     (match_time_msk AT TIME ZONE 'Europe/Moscow')::date as match_date,
                     COUNT(*) as count
                 FROM dota_matches
@@ -619,11 +625,11 @@ async def matches_stats():
                 "finished": total_stats[3],
             },
             "top_tournaments": [
-                {"tournament": row[0], "count": row[1]} 
+                {"tournament": row[0], "count": row[1]}
                 for row in tournament_stats
             ],
             "recent_activity": [
-                {"date": row[0].isoformat(), "count": row[1]} 
+                {"date": row[0].isoformat(), "count": row[1]}
                 for row in date_stats
             ],
         }
@@ -636,14 +642,12 @@ async def matches_stats():
 
 @app.get("/health")
 async def health_check():
-    """
-    Проверка здоровья API и подключения к БД
-    """
+    """Проверка здоровья API и подключения к БД."""
     try:
         async with db_pool.get_connection() as cur:
             await cur.execute("SELECT 1;")
             await cur.fetchone()
-        
+
         return {
             "status": "healthy",
             "database": "connected",
@@ -657,7 +661,6 @@ async def health_check():
             "error": str(e),
             "timestamp": datetime.now().isoformat(),
         }
-
 
 
 if __name__ == "__main__":

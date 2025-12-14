@@ -330,12 +330,12 @@ async def get_team_urls_batch(team_names: List[str]) -> Dict[str, Optional[str]]
     return {name: result.get(name.lower()) for name in team_names}
 
 
-# ---------- CS2: бизнес-логика ----------
+# ---------- CS2: бизнес-логика (ОБНОВЛЕНО ПОД НОВУЮ СХЕМУ) ----------
 
 async def get_cs2_team_urls_batch(team_names: List[str]) -> Dict[str, Optional[str]]:
     """
-    Пакетная загрузка URL команд CS2 (HLTV) за один запрос.
-    Возвращает dict: {team_name: hltv_url or None}
+    Пакетная загрузка URL команд CS2 (Liquipedia) из таблицы cs2_teams за один запрос.
+    Возвращает dict: {team_name: liquipedia_url or None}
     """
     if not team_names:
         return {}
@@ -347,7 +347,7 @@ async def get_cs2_team_urls_batch(team_names: List[str]) -> Dict[str, Optional[s
     async with db_pool.get_connection() as cur:
         await cur.execute(
             """
-            SELECT name, hltv_url
+            SELECT name, liquipedia_url
             FROM cs2_teams
             WHERE LOWER(name) = ANY(%s);
             """,
@@ -357,17 +357,20 @@ async def get_cs2_team_urls_batch(team_names: List[str]) -> Dict[str, Optional[s
 
     result = {name.lower(): None for name in unique_names}
     for row_name, row_url in rows:
-        result[row_name.lower()] = row_url
+        if row_name:
+            result[str(row_name).lower()] = row_url
 
+    # Важно: возвращаем по исходным именам, чтобы не ломать внешний интерфейс
     return {name: result.get(name.lower()) for name in team_names}
 
 
 async def get_cs2_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
     """
     Асинхронно получает список CS2 матчей на указанную дату (по МСК)
-    из таблиц cs2_matches + cs2_events.
+    из таблицы public.cs2_matches (НОВАЯ СХЕМА).
 
-    Важно: score в cs2_matches отсутствует -> отдаём null.
+    Используем match_time_msk, score, tournament, team1_url/team2_url если они уже есть.
+    Если url команд не заполнены — добираем через cs2_teams по name.
     """
     tz_msk = _get_timezone_msk()
 
@@ -375,78 +378,99 @@ async def get_cs2_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
         await cur.execute(
             """
             SELECT
-                m.match_id,
-                m.when_utc,
-                m.team1,
-                m.team2,
-                m.bo,
-                COALESCE(m.event_title, e.name) AS tournament,
-                m.status,
-                m.url
-            FROM cs2_matches m
-            LEFT JOIN cs2_events e ON e.event_id = m.event_id
-            WHERE (m.when_utc AT TIME ZONE 'Europe/Moscow')::date = %s
-            ORDER BY m.when_utc;
+                id,
+                match_time_msk,
+                team1,
+                team2,
+                score,
+                bo,
+                tournament,
+                status,
+                match_uid,
+                match_url,
+                liquipedia_match_id,
+                team1_url,
+                team2_url
+            FROM cs2_matches
+            WHERE (match_time_msk AT TIME ZONE 'Europe/Moscow')::date = %s
+            ORDER BY match_time_msk;
             """,
             (target_date,),
         )
         rows = await cur.fetchall()
 
-    all_team_names: List[str] = []
+    # Собираем команды для batch lookup (только для тех матчей, где URL команд не заполнены)
+    need_lookup_team_names: List[str] = []
     for row in rows:
         team1 = row[2]
         team2 = row[3]
-        if team1:
-            all_team_names.append(team1)
-        if team2:
-            all_team_names.append(team2)
+        team1_url = row[11]
+        team2_url = row[12]
 
-    team_urls = await get_cs2_team_urls_batch(all_team_names)
+        if team1 and not team1_url:
+            need_lookup_team_names.append(team1)
+        if team2 and not team2_url:
+            need_lookup_team_names.append(team2)
+
+    team_urls_lookup = await get_cs2_team_urls_batch(need_lookup_team_names)
 
     matches: List[Dict[str, Any]] = []
-    seen: set[int] = set()
+    seen_uids: set[str] = set()
 
     for row in rows:
         (
-            match_id,
-            when_utc,
+            row_id,
+            match_time_msk,
             team1,
             team2,
+            score,
             bo_int,
             tournament,
             status,
+            match_uid,
             match_url,
+            liquipedia_match_id,
+            team1_url,
+            team2_url,
         ) = row
 
-        if match_id in seen:
+        # match_uid в схеме NOT NULL + UNIQUE, но на всякий случай
+        if match_uid and match_uid in seen_uids:
             continue
-        seen.add(match_id)
+        if match_uid:
+            seen_uids.add(match_uid)
 
-        if when_utc is None:
-            # На всякий случай: если дата пустая — пропускаем, иначе клиенту будет больно.
+        if match_time_msk is None:
             continue
 
-        if when_utc.tzinfo is None:
-            when_msk = when_utc.replace(tzinfo=timezone.utc).astimezone(tz_msk)
+        if match_time_msk.tzinfo is None:
+            when_msk = match_time_msk.replace(tzinfo=timezone.utc).astimezone(tz_msk)
         else:
-            when_msk = when_utc.astimezone(tz_msk)
+            when_msk = match_time_msk.astimezone(tz_msk)
+
+        resolved_team1_url = team1_url or (team_urls_lookup.get(team1) if team1 else None)
+        resolved_team2_url = team2_url or (team_urls_lookup.get(team2) if team2 else None)
+
+        # Чтобы клиенту всегда было, за что зацепиться:
+        stable_match_id = liquipedia_match_id or match_uid or (str(row_id) if row_id is not None else None)
 
         matches.append(
             {
                 "match_time_msk": when_msk.isoformat(),
                 "time_msk": when_msk.strftime("%H:%M"),
                 "team1": team1,
-                "team1_url": team_urls.get(team1) if team1 else None,
+                "team1_url": resolved_team1_url,
                 "team2": team2,
-                "team2_url": team_urls.get(team2) if team2 else None,
+                "team2_url": resolved_team2_url,
                 "bo": bo_int,
                 "tournament": tournament or "",
                 "status": status or "unknown",
-                "score": None,
-                # чтобы формат был “как у dota2”, кладём id сюда
-                "liquipedia_match_id": str(match_id),
-                # и нормальное поле тоже (не мешает, зато удобно)
-                "match_id": match_id,
+                "score": score,
+                # сохраняем “как у dota2”, но под капотом это может быть твой stable id
+                "liquipedia_match_id": stable_match_id,
+                # дополнительные поля — не мешают, но полезны
+                "id": row_id,
+                "match_uid": match_uid,
                 "match_url": match_url,
             }
         )
@@ -469,7 +493,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="CyberMatches API",
-    description="Оптимизированный API для матчей Dota 2 из Liquipedia + CS2 из HLTV",
+    description="Оптимизированный API для матчей Dota 2 из Liquipedia + CS2",
     version="2.1.0",
     lifespan=lifespan,
 )

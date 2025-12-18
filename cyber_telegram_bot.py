@@ -804,8 +804,13 @@ def _format_match_line(m: Match, group: str, now_msk: Optional[datetime] = None)
         return " ".join(parts)
 
 
-def build_core_text(matches: List[Match], day: date) -> str:
+def build_core_text(filtered_matches: List[Match], all_matches: List[Match], day: date, game: str) -> str:
+    game_name = "Dota 2" if game == GAME_DOTA else "Counter-Strike 2" if game == GAME_CS2 else game.upper()
+    game_emoji = "⚔️" if game == GAME_DOTA else "🔫" if game == GAME_CS2 else "🎮"
+
     now_msk = datetime.now(MSK_TZ)
+
+    matches = filtered_matches  # use filtered
 
     live: List[Match] = []
     upcoming: List[Match] = []
@@ -828,22 +833,32 @@ def build_core_text(matches: List[Match], day: date) -> str:
     parts: List[str] = []
     separator = "━" * 14
 
-    parts.append(f"📅 Матчи на {day.strftime('%d.%m.%Y')} (МСК)")
+    header = f"{game_emoji} {game_name} матчи на {day.strftime('%d.%m.%Y')} (МСК)"
+
+    if not matches:
+        parts.append(header)
+        if not all_matches:
+            # No matches at all for this day
+            parts.append("❌ Нет матчей на этот день.")
+        else:
+            # Matches exist but hidden by filters
+            parts.append("❌ Совпадений по выбранным фильтрам не найдено.")
+            parts.append("")
+            parts.append("💡 Используйте фильтры в рамках карточки ниже, чтобы настроить отображение турниров.")
+        return "\n".join(parts).strip()
+
+    parts.append(header)
     parts.append(separator)
 
-    live_header = f"🟢 LIVE • {_pluralize_matches(len(live))}"
     if live:
+        live_header = f"🟢 LIVE • {_pluralize_matches(len(live))}"
         lines = [live_header] + [_format_match_line(m, "live", now_msk) for m in live]
         parts.append("\n".join(lines))
-    else:
-        parts.append(live_header)
-
-    parts.append(separator)
-
-    upcoming_header = f"⏰ Скоро начнутся • {_pluralize_matches(len(upcoming))}"
-    parts.append(upcoming_header)
 
     if upcoming:
+        if live:
+            parts.append(separator)
+        parts.append(f"⏰ Скоро начнутся • {_pluralize_matches(len(upcoming))}")
         tournaments: Dict[str, List[Match]] = defaultdict(list)
         for m in upcoming:
             tournaments[m.tournament or "Other"].append(m)
@@ -861,12 +876,10 @@ def build_core_text(matches: List[Match], day: date) -> str:
 
             parts.append("")
 
-    parts.append(separator)
-
-    finished_header = f"✅ Завершённые • {_pluralize_matches(len(finished))}"
-    parts.append(finished_header)
-
     if finished:
+        if live or upcoming:
+            parts.append(separator)
+        parts.append(f"✅ Завершённые • {_pluralize_matches(len(finished))}")
         tournaments: Dict[str, List[Match]] = defaultdict(list)
         for m in finished:
             tournaments[m.tournament or "Other"].append(m)
@@ -1002,7 +1015,7 @@ async def _update_today_states_for_day(bot: Bot, game: str, day: date, matches: 
         excluded = state.excluded_tournaments or set()
         filtered_matches = [m for m in matches if m.tournament not in excluded] if excluded else matches
 
-        core = build_core_text(filtered_matches, day)
+        core = build_core_text(filtered_matches, matches, day, game)
         new_text = make_full_text(core, now_msk)
 
         keyboard = build_main_keyboard(
@@ -1264,7 +1277,7 @@ async def cmd_today(message: Message):
         filtered_matches = [m for m in matches if m.tournament not in excluded] if excluded else matches
 
         now_msk = datetime.now(MSK_TZ)
-        core = build_core_text(filtered_matches, day)
+        core = build_core_text(filtered_matches, matches, day, game)
         text = make_full_text(core, now_msk)
 
         keyboard = build_main_keyboard(
@@ -1339,7 +1352,7 @@ async def callback_filter(callback: CallbackQuery):
     filtered_matches = [m for m in matches if m.tournament not in state.excluded_tournaments]
 
     now_msk = datetime.now(MSK_TZ)
-    core = build_core_text(filtered_matches, day)
+    core = build_core_text(filtered_matches, matches, day, game)
     new_text = make_full_text(core, now_msk)
 
     keyboard = build_main_keyboard(
@@ -1572,7 +1585,7 @@ async def daily_notifier(bot: Bot) -> None:
 
                     filtered_matches = [m for m in matches if m.tournament not in excluded] if excluded else matches
 
-                    core = build_core_text(filtered_matches, today)
+                    core = build_core_text(filtered_matches, matches, today, game)
                     text = make_full_text(core, datetime.now(MSK_TZ))
 
                     keyboard = build_main_keyboard(

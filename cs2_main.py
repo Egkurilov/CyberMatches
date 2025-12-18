@@ -475,6 +475,32 @@ def _extract_team_path_and_url(a_tag: Optional[Tag]) -> Tuple[Optional[str], Opt
     return path, url
 
 
+_SLUG_SAFE_RE = re.compile(r"[^a-z0-9_]+")
+
+def _slug_from_name(name: str) -> str:
+    s = (name or "").strip().lower()
+    s = s.replace("&", "and")
+    s = s.replace(" ", "_")
+    s = re.sub(r"\s+", "_", s)
+    s = _SLUG_SAFE_RE.sub("", s)
+    s = re.sub(r"_+", "_", s).strip("_")
+    return s
+
+def _team_uid_token(name: Optional[str], path: Optional[str], url: Optional[str]) -> str:
+    # 1) реальный path/url
+    ref = _norm_team_ref(path) or _norm_team_ref(url)
+    if ref:
+        return ref  # "/counterstrike/..."
+
+    # 2) TBD/пусто
+    if not name or name.strip() == "" or name.strip().lower() == "tbd":
+        return "tbd"
+
+    # 3) детерминированный guess по имени (стабильно между запусками)
+    slug = _slug_from_name(name)
+    return f"/counterstrike/{slug}" if slug else "tbd"
+
+
 def _norm_team_ref(ref: Optional[str]) -> Optional[str]:
     """
     Нормализуем ссылку/путь команды к виду "/counterstrike/team_vitality".
@@ -634,6 +660,46 @@ def _extract_score_and_bo(container: Tag) -> Tuple[Optional[str], Optional[str]]
     return score, bo_txt
 
 
+def normalize_match(m: Match) -> Match:
+    """
+    Чистим мусорные состояния, чтобы:
+    - не хранить finished без команд
+    - не хранить 0:0 как finished
+    - не оставлять кривой score
+    """
+    # если live/finished, но команд нет — это мусор
+    if m.status in ("live", "finished") and (not m.team1 or not m.team2):
+        m.status = "unknown"
+        m.score = None
+        return m
+
+    # если score не парсится — выкидываем score
+    st = parse_score_tuple(m.score)
+    if st is None:
+        if m.status == "finished":
+            m.status = None
+        m.score = None
+        return m
+
+    a, b = st
+
+    # finished + 0:0 — мусор
+    if m.status == "finished" and a == 0 and b == 0:
+        m.status = None
+        m.score = None
+        return m
+
+    # если есть Bo и это series-score, но до победы не дошли — не считаем finished
+    bo_int = parse_bo_int(m.bo)
+    if bo_int and m.score and _is_series_score(m.score, bo_int) and m.status == "finished":
+        needed = bo_int // 2 + 1
+        if max(a, b) < needed:
+            m.status = "live" if (a > 0 or b > 0) else "unknown"
+            return m
+
+    return m
+
+
 def parse_matches_from_html(html: str) -> List[Match]:
     soup = BeautifulSoup(html, "html.parser")
     containers = soup.select(".match-info")
@@ -774,15 +840,19 @@ def _uid_team_part(m: Match, which: int) -> str:
 
 
 def build_fallback_match_uid(m: Match) -> str:
-    time_part = m.time_msk.isoformat() if m.time_msk else ""
-    bo_int = parse_bo_int(m.bo) or 0
-    return "|".join([
-        time_part,
-        _uid_team_part(m, 1),
-        _uid_team_part(m, 2),
-        _tour_key(m.tournament),
-        f"bo{bo_int}",
-    ])
+    # Используем только дату для стабильности, без точного времени, чтобы избежать изменения UID при коррекции времени на LP
+    time_part = m.time_msk.date().isoformat() if m.time_msk else ""
+
+    left  = _team_uid_token(m.team1, m.team1_path, m.team1_url)
+    right = _team_uid_token(m.team2, m.team2_path, m.team2_url)
+
+    # Сортируем ключи команд, чтобы порядок не влиял на UID
+    teams_key = "+".join(sorted([left, right])) if left and right else f"{left or ''}<>{right or ''}"
+
+    tour = _tour_key(m.tournament)
+    bo = parse_bo_int(m.bo) or 0
+
+    return "|".join([time_part, f"teams={teams_key}", tour, f"bo{bo}"])
 
 
 def deduplicate_matches(matches: List[Match]) -> List[Match]:
@@ -791,6 +861,10 @@ def deduplicate_matches(matches: List[Match]) -> List[Match]:
     for m in matches:
         uid = build_match_uid(m) or build_fallback_match_uid(m)
         if uid in seen:
+            logger.warning(
+                "Дубликат в parsed матчах - UID: %s для %s vs %s в %s турнир=%s статус=%s счёт=%s",
+                uid, m.team1 or '', m.team2 or '', m.time_msk, m.tournament, m.status, m.score
+            )
             continue
         seen.add(uid)
         out.append(m)
@@ -801,6 +875,36 @@ def deduplicate_matches(matches: List[Match]) -> List[Match]:
 # ---------------------------------------------------------------------------
 # AUTO-REPAIR (minimal)
 # ---------------------------------------------------------------------------
+
+def deduplicate_duplicates_in_db() -> None:
+    """
+    Удаляет дубликаты матчей по комбинации tournament, team1, team2, bo.
+    Оставляет самый ранний id для каждой группы дубликатов.
+    """
+    with get_db_connection() as conn:
+        ensure_cs2_teams_table(conn)
+        ensure_cs2_matches_table(conn)
+
+        with conn.cursor() as cur:
+            cur.execute(f"""
+                WITH duplicates AS (
+                    SELECT id,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY LOWER(tournament), LOWER(team1), LOWER(team2), bo
+                               ORDER BY id
+                           ) AS rn
+                    FROM public.{MATCHES_TABLE}
+                    WHERE tournament IS NOT NULL AND team1 IS NOT NULL AND team2 IS NOT NULL AND bo IS NOT NULL
+                )
+                DELETE FROM public.{MATCHES_TABLE}
+                WHERE id IN (SELECT id FROM duplicates WHERE rn > 1);
+            """)
+            deleted = cur.rowcount
+
+        conn.commit()
+
+    logger.info("[DEDUPE-DB] удалено дубликатов: %d", deleted)
+
 
 def auto_repair_matches() -> None:
     with get_db_connection() as conn:
@@ -970,6 +1074,14 @@ def _save_matches_to_db_impl(matches: List[Match]) -> None:
 # ---------------------------------------------------------------------------
 # SCORE UPDATES (match by team pair + nearest time)
 # ---------------------------------------------------------------------------
+
+def _team_pair_key(team1_url: Optional[str], team2_url: Optional[str]) -> Optional[frozenset[str]]:
+    """
+    Совместимость со старым кодом: возвращает ключ пары команд.
+    Используем нормализацию до /counterstrike/... через _team_pair_key_by_paths().
+    """
+    return _team_pair_key_by_paths(team1_url, team2_url)
+
 
 def _index_completed_matches(completed: List[Match]) -> Tuple[Dict[frozenset[str], List[Match]], Dict[frozenset[str], List[Match]]]:
     """
@@ -1327,6 +1439,7 @@ def worker_once() -> None:
     metrics["deduped_matches"] = len(matches)
 
     save_matches_to_db(matches)
+    deduplicate_duplicates_in_db()
     update_scores_from_match_pages()
     refresh_statuses_in_db()
 

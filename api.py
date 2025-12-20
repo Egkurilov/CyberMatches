@@ -1,4 +1,5 @@
 from __future__ import annotations
+import time
 
 import os
 import asyncio
@@ -10,6 +11,7 @@ import re
 from dotenv import load_dotenv
 import psycopg
 from psycopg import AsyncConnection
+from psycopg_pool import AsyncConnectionPool
 from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 
@@ -21,7 +23,8 @@ load_dotenv()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
+    datefmt="%Y-%m-%d %H:%M:%S",
+    filename=os.path.join(os.path.dirname(__file__), "logs", "api.log")
 )
 logger = logging.getLogger("cybermatches_api")
 
@@ -36,9 +39,32 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 if not all([DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD]):
     raise RuntimeError("Не хватает параметров подключения к БД в .env")
 
+# ---------- П araллелизм DB ----------
+
+active_db_ops = 0
+active_lock = asyncio.Lock()
+
+@asynccontextmanager
+async def db_cursor(tag: str):
+    """
+    Контекстный менеджер для получения курсора с логированием параллелизма.
+    """
+    global active_db_ops
+    async with active_lock:
+        active_db_ops += 1
+        current = active_db_ops
+    t0 = time.time()
+    try:
+        async with db_pool.get_connection() as cur:
+            logger.info(f"[DB] {tag} acquired (active={current}) in {time.time()-t0:.3f}s")
+            yield cur
+    finally:
+        async with active_lock:
+            active_db_ops -= 1
+
 # ---------- Пул подключений к БД ----------
 class DatabasePool:
-    """Асинхронный пул (по факту один коннект) к PostgreSQL"""
+    """Асинхронный пул подключений к PostgreSQL с использованием psycopg_pool"""
 
     def __init__(self):
         self.conn_str = (
@@ -48,69 +74,33 @@ class DatabasePool:
             f"user={DB_USER} "
             f"password={DB_PASSWORD}"
         )
-        self._pool: Optional[AsyncConnection] = None
-
-    async def _create_connection(self) -> AsyncConnection:
-        """Создаёт новое соединение с БД"""
-        conn = await AsyncConnection.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            autocommit=True,
+        self._pool = AsyncConnectionPool(
+            self.conn_str,
+            min_size=1,
+            max_size=10,
+            open=False,
         )
-        return conn
-
-    async def _ensure_connection(self):
-        """
-        Гарантирует, что у нас есть живое соединение.
-        Если коннект отсутствует или закрыт — создаём новый.
-        """
-        if self._pool is None or getattr(self._pool, "closed", False):
-            if self._pool is not None:
-                try:
-                    await self._pool.close()
-                except Exception:
-                    pass
-
-            logger.warning("Соединение с БД отсутствует или закрыто, пробуем переподключиться...")
-            self._pool = await self._create_connection()
-            logger.info("Соединение с БД установлено")
 
     async def init_pool(self):
         """Инициализация пула подключений"""
-        await self._ensure_connection()
+        await self._pool.open()
+        logger.info("Пул подключений к БД открыт")
 
     @asynccontextmanager
     async def get_connection(self):
         """
         Контекстный менеджер для получения курсора.
-        При каждом вызове проверяем, что коннект жив.
         """
-        await self._ensure_connection()
-
-        try:
-            async with self._pool.cursor() as cur:
+        async with self._pool.connection() as conn:
+            async with conn.cursor() as cur:
                 yield cur
-        except (psycopg.OperationalError, psycopg.InterfaceError) as e:
-            logger.error(f"Ошибка работы с БД (соединение будет пересоздано): {e}")
-            try:
-                if self._pool and not getattr(self._pool, "closed", False):
-                    await self._pool.close()
-            except Exception:
-                pass
-
-            self._pool = None
-            raise
 
     async def close_pool(self):
         """Закрытие пула подключений"""
-        if self._pool:
-            try:
-                await self._pool.close()
-            finally:
-                logger.info("Пул подключений к БД закрыт")
+        try:
+            await self._pool.close()
+        finally:
+            logger.info("Пул подключений к БД закрыт")
 
 
 # Создание глобального экземпляра пула
@@ -159,8 +149,12 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
     Асинхронно получает список матчей на указанную дату (по МСК).
     """
     tz_msk = _get_timezone_msk()
+    # Рассчёт границ дня в московском часовом поясе
+    start_dt = datetime.combine(target_date, datetime.min.time(), tzinfo=tz_msk)
+    end_dt = start_dt + timedelta(days=1)
 
-    async with db_pool.get_connection() as cur:
+    async with db_cursor("DOTA SELECT") as cur:
+        t1 = time.time()
         await cur.execute(
             """
             SELECT
@@ -175,12 +169,17 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
                 match_uid,
                 match_url
             FROM dota_matches
-            WHERE (match_time_msk AT TIME ZONE 'Europe/Moscow')::date = %s
+            WHERE match_time_msk >= %s AND match_time_msk < %s
             ORDER BY match_time_msk;
             """,
-            (target_date,),
+            (start_dt, end_dt),
         )
+        t2 = time.time()
         rows = await cur.fetchall()
+        t3 = time.time()
+    logger.info(
+        f"[DOTA] acquire={0:.3f}s exec={t2-t1:.3f}s fetch={t3-t2:.3f}s total={t3-t1:.3f}s rows={len(rows)}"
+    )
 
     all_team_names = []
     for row in rows:
@@ -191,7 +190,10 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
         if team2:
             all_team_names.append(team2)
 
+    start_lookup = time.time()
     team_urls = await get_team_urls_batch(all_team_names)
+    lookup_time = time.time() - start_lookup
+    logger.info(f"[DOTA] Team lookup: {len(set(name for name in all_team_names if name))} unique teams in {lookup_time:.3f}s")
 
     matches_by_key: Dict[Any, Dict[str, Any]] = {}
 
@@ -372,8 +374,15 @@ async def get_cs2_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
     Используем match_time_msk, score, tournament, team1_url/team2_url если они уже есть.
     Если url команд не заполнены — добираем через cs2_teams по name.
     """
-    tz_msk = _get_timezone_msk()
+    import time
 
+    tz_msk = _get_timezone_msk()
+    # Рассчёт границ дня в московском часовом поясе
+    start_dt = datetime.combine(target_date, datetime.min.time(), tzinfo=tz_msk)
+    end_dt = start_dt + timedelta(days=1)
+
+    start_total = time.time()
+    start_select = time.time()
     async with db_pool.get_connection() as cur:
         await cur.execute(
             """
@@ -392,14 +401,17 @@ async def get_cs2_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
                 team1_url,
                 team2_url
             FROM cs2_matches
-            WHERE (match_time_msk AT TIME ZONE 'Europe/Moscow')::date = %s
+            WHERE match_time_msk >= %s AND match_time_msk < %s
             ORDER BY match_time_msk;
             """,
-            (target_date,),
+            (start_dt, end_dt),
         )
         rows = await cur.fetchall()
+    select_time = time.time() - start_select
+    logger.info(f"[CS2] SELECT: got {len(rows)} rows for {target_date} in {select_time:.3f}s")
 
     # Собираем команды для batch lookup (только для тех матчей, где URL команд не заполнены)
+    start_lookup = time.time()
     need_lookup_team_names: List[str] = []
     for row in rows:
         team1 = row[2]
@@ -413,7 +425,10 @@ async def get_cs2_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
             need_lookup_team_names.append(team2)
 
     team_urls_lookup = await get_cs2_team_urls_batch(need_lookup_team_names)
+    lookup_time = time.time() - start_lookup
+    logger.info(f"[CS2] Team lookup: {len(need_lookup_team_names)} unique teams в {lookup_time:.3f}s")
 
+    start_processing = time.time()
     matches: List[Dict[str, Any]] = []
     seen_uids: set[str] = set()
 
@@ -434,7 +449,6 @@ async def get_cs2_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
             team2_url,
         ) = row
 
-        # match_uid в схеме NOT NULL + UNIQUE, но на всякий случай
         if match_uid and match_uid in seen_uids:
             continue
         if match_uid:
@@ -451,7 +465,6 @@ async def get_cs2_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
         resolved_team1_url = team1_url or (team_urls_lookup.get(team1) if team1 else None)
         resolved_team2_url = team2_url or (team_urls_lookup.get(team2) if team2 else None)
 
-        # Чтобы клиенту всегда было, за что зацепиться:
         stable_match_id = liquipedia_match_id or match_uid or (str(row_id) if row_id is not None else None)
 
         matches.append(
@@ -466,16 +479,16 @@ async def get_cs2_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
                 "tournament": tournament or "",
                 "status": status or "unknown",
                 "score": score,
-                # сохраняем “как у dota2”, но под капотом это может быть твой stable id
                 "liquipedia_match_id": stable_match_id,
-                # дополнительные поля — не мешают, но полезны
                 "id": row_id,
                 "match_uid": match_uid,
                 "match_url": match_url,
             }
         )
 
-    logger.info(f"Получено {len(matches)} CS2 матчей для даты {target_date}")
+    processing_time = time.time() - start_processing
+    total_time = time.time() - start_total
+    logger.info(f"[CS2] Processing: {len(matches)} matches prepared in {processing_time:.3f}s, total: {total_time:.3f}s")
     return matches
 
 
@@ -484,7 +497,8 @@ async def get_cs2_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Управление жизненным циклом приложения (startup/shutdown)."""
-    logging.info("Startup: инициализация пула подключений к БД")
+    import os
+    logging.info(f"Startup: PID={os.getpid()}, инициализация пула подключений к БД")
     await db_pool.init_pool()
     yield
     logging.info("Shutdown: закрытие пула подключений к БД")

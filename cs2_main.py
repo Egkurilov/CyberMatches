@@ -806,6 +806,13 @@ def parse_matches_from_html(html: str) -> List[Match]:
             status=status,
             match_url=match_url,
         )
+
+        # Фильтруем матчи с TBD командами, чтобы не вставлять live TBD vs TBD
+        if m_obj.team1 and m_obj.team1.strip().lower() == "tbd":
+            continue
+        if m_obj.team2 and m_obj.team2.strip().lower() == "tbd":
+            continue
+
         matches.append(m_obj)
 
     logger.info("[DEBUG] parsed matches: %d", len(matches))
@@ -840,19 +847,14 @@ def _uid_team_part(m: Match, which: int) -> str:
 
 
 def build_fallback_match_uid(m: Match) -> str:
-    # Используем только дату для стабильности, без точного времени, чтобы избежать изменения UID при коррекции времени на LP
-    time_part = m.time_msk.date().isoformat() if m.time_msk else ""
-
-    left  = _team_uid_token(m.team1, m.team1_path, m.team1_url)
-    right = _team_uid_token(m.team2, m.team2_path, m.team2_url)
-
-    # Сортируем ключи команд, чтобы порядок не влиял на UID
-    teams_key = "+".join(sorted([left, right])) if left and right else f"{left or ''}<>{right or ''}"
+    # Используем Unix timestamp из HTML для уникальности и стабильности
+    # Не включаем команды в UID, чтобы матчи с TBD могли обновляться при появлении реальных команд
+    ts = str(int(m.time_msk.timestamp())) if m.time_msk else ""
 
     tour = _tour_key(m.tournament)
     bo = parse_bo_int(m.bo) or 0
 
-    return "|".join([time_part, f"teams={teams_key}", tour, f"bo{bo}"])
+    return f"{ts}|{tour}|bo{bo}"
 
 
 def deduplicate_matches(matches: List[Match]) -> List[Match]:

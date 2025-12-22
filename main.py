@@ -209,6 +209,15 @@ def normalize_team_name(name: Optional[str]) -> Optional[str]:
         return None
     return name.strip()
 
+def is_placeholder_team(name: Optional[str]) -> bool:
+    """
+    Возвращает True для заглушек вида TBD / TBA / пустая строка.
+    """
+    if not name:
+        return True
+    normalized = name.strip().lower()
+    return normalized in {"tbd", "tba", "to be decided", "to be determined", ""}
+
 
 def parse_time_to_msk(time_str: str) -> Optional[datetime]:
     """
@@ -339,6 +348,16 @@ def auto_repair_matches() -> None:
             )
             deleted_no_uid = cur.rowcount
 
+            # 1б) Удаляем строки, где обе команды — плейсхолдеры (TBD/TBA/пусто)
+            cur.execute(
+                """
+                DELETE FROM dota_matches
+                WHERE (team1 IS NULL OR trim(team1) = '' OR lower(team1) IN ('tbd','tba','to be decided','to be determined'))
+                  AND (team2 IS NULL OR trim(team2) = '' OR lower(team2) IN ('tbd','tba','to be decided','to be determined'));
+                """
+            )
+            deleted_placeholder_teams = cur.rowcount
+
             # 2) Удаляем TBD-плейсхолдеры,
             #    если в этом же слоте (время+турнир) уже есть матч с нормальными командами
             cur.execute(
@@ -411,6 +430,7 @@ def auto_repair_matches() -> None:
 
     print(
         f"[AUTO-REPAIR] deleted_no_uid={deleted_no_uid}, "
+        f"deleted_placeholder_teams={deleted_placeholder_teams}, "
         f"deleted_tbd={deleted_tbd}, "
         f"fixed_finished_no_teams={fixed_finished_no_teams}, "
         f"fixed_finished_zero_zero={fixed_finished_zero_zero}, "
@@ -859,6 +879,15 @@ def parse_matches_from_html(html: str) -> List[Match]:
         else:
             match_url = None
 
+        # --- Пропускаем матчи, где обе команды — заглушки (TBD/TBA/пусто) ---
+        if is_placeholder_team(team1) and is_placeholder_team(team2):
+            logger.info(
+                "Пропускаем матч с пустыми командами: time=%s url=%s",
+                time_raw,
+                match_url,
+            )
+            continue
+
 
         m_obj = Match(
             time_msk=time_msk,
@@ -923,6 +952,25 @@ def build_match_uid(m: Match) -> Optional[str]:
     if not liqui_id:
         return None
     return f"lp:{liqui_id}"
+
+def build_fallback_match_uid(m: Match) -> str:
+    """
+    Детерминированный fallback UID, если Liquipedia Match:ID недоступен.
+    Формат: time|team1|team2|tournament|boX (в нижнем регистре).
+    """
+    time_part = ""
+    if m.time_msk is not None:
+        try:
+            time_part = m.time_msk.isoformat()
+        except Exception:
+            time_part = str(m.time_msk)
+
+    team1 = (m.team1 or "").strip().lower()
+    team2 = (m.team2 or "").strip().lower()
+    tournament = (m.tournament or "").strip().lower()
+    bo_int = parse_bo_int(m.bo) or 0
+
+    return "|".join([time_part, team1, team2, tournament, f"bo{bo_int}"])
 
 
 
@@ -1167,6 +1215,61 @@ def _save_matches_to_db_impl(matches: List[Match]) -> None:
                                 },
                             )
                             existing_row = cur.fetchone()
+
+                        # 2в) если отсутствует одна команда — пытаемся матчить по времени + турниру
+                        if (
+                            existing_row is None
+                            and m.time_msk is not None
+                            and m.tournament
+                            and (m.team1 or m.team2)
+                        ):
+                            cleaned_tournament = (
+                                clean_tournament_name(m.tournament) or m.tournament
+                            )
+                            if m.team1 and not m.team2:
+                                cur.execute(
+                                    """
+                                    SELECT id, match_uid
+                                    FROM dota_matches
+                                    WHERE
+                                        team1 = %(team)s
+                                        AND lower(tournament) LIKE lower(%(tournament_prefix)s)
+                                        AND match_time_msk IS NOT NULL
+                                        AND ABS(
+                                            EXTRACT(EPOCH FROM (match_time_msk - %(match_time_msk)s))
+                                        ) <= 900
+                                    ORDER BY match_time_msk DESC
+                                    LIMIT 1;
+                                    """,
+                                    {
+                                        "team": m.team1,
+                                        "tournament_prefix": cleaned_tournament + "%",
+                                        "match_time_msk": m.time_msk,
+                                    },
+                                )
+                                existing_row = cur.fetchone()
+                            elif m.team2 and not m.team1:
+                                cur.execute(
+                                    """
+                                    SELECT id, match_uid
+                                    FROM dota_matches
+                                    WHERE
+                                        team2 = %(team)s
+                                        AND lower(tournament) LIKE lower(%(tournament_prefix)s)
+                                        AND match_time_msk IS NOT NULL
+                                        AND ABS(
+                                            EXTRACT(EPOCH FROM (match_time_msk - %(match_time_msk)s))
+                                        ) <= 900
+                                    ORDER BY match_time_msk DESC
+                                    LIMIT 1;
+                                    """,
+                                    {
+                                        "team": m.team2,
+                                        "tournament_prefix": cleaned_tournament + "%",
+                                        "match_time_msk": m.time_msk,
+                                    },
+                                )
+                                existing_row = cur.fetchone()
 
                         if existing_row:
                             old_id, old_uid = existing_row
@@ -1569,7 +1672,7 @@ def update_scores_from_match_pages() -> None:
                     bo
                 FROM dota_matches
                 WHERE
-                    (status = 'live' OR status = 'upcoming' OR status IS NULL)
+                    (status = 'live' OR status = 'upcoming' OR status = 'unknown' OR status IS NULL)
                     AND match_time_msk IS NOT NULL
                     AND match_time_msk < (now() AT TIME ZONE 'Europe/Moscow') - INTERVAL '10 minutes'
                 ORDER BY match_time_msk

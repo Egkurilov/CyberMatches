@@ -1,0 +1,21 @@
+-- Migration 002: Add missing indexes for CS2 to match Dota 2 performance
+-- Created: 2025-12-XX based on analysis
+-- Purpose: Speed up CS2 API queries, which lack date/status/tournament indexes
+
+-- Индекс 1: Оптимизация CS2 запросов по дате (аналогично Dota)
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_cs2_matches_time_msk_date
+ON cs2_matches ((match_time_msk AT TIME ZONE 'Europe/Moscow')::date);
+
+-- Индекс 2: CS2 фильтрация по статусу + времени (для обновления live матчей)
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_cs2_matches_status_time
+ON cs2_matches (status, match_time_msk)
+WHERE status IN ('live', 'upcoming');
+
+-- Индекс 3: CS2 агрегация по турнирам (для статистики и фильтрации)
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_cs2_matches_tournament
+ON cs2_matches (tournament)
+WHERE tournament IS NOT NULL;
+
+-- Опционально:复合 индекс для быстрого поиска по дате + статусу
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_cs2_matches_date_status
+ON cs2_matches ((match_time_msk AT TIME ZONE 'Europe/Moscow')::date, status);

@@ -1,0 +1,678 @@
+[2025-12-12 23:52:47] [INFO] dota_matches_bot - Логирование инициализировано
+[2025-12-12 23:52:47] [INFO] dota_matches_bot - MATCHES_API_BASE_URL = http://45.10.245.84:8050/dota/matches
+[2025-12-12 23:52:47] [INFO] dota_matches_bot - Запуск бота...
+[2025-12-12 23:52:47] [INFO] dota_matches_bot - Инициализация БД...
+[2025-12-12 23:53:08] [INFO] dota_matches_bot - Логирование инициализировано
+[2025-12-12 23:53:08] [INFO] dota_matches_bot - MATCHES_API_BASE_URL = http://45.10.245.84:8050/dota/matches
+[2025-12-12 23:53:08] [INFO] dota_matches_bot - Запуск бота...
+[2025-12-12 23:53:08] [INFO] dota_matches_bot - Инициализация БД...
+[2025-12-12 23:53:09] [INFO] dota_matches_bot - БД и таблицы инициализированы.
+[2025-12-12 23:53:09] [INFO] dota_matches_bot - Старт фонового поллера матчей
+[2025-12-12 23:53:09] [INFO] dota_matches_bot - Старт ежедневного нотификатора (10:00 МСК, один раз в день)
+[2025-12-12 23:53:09] [INFO] dota_matches_bot - Старт таска напоминаний о матчах
+[2025-12-12 23:53:54] [INFO] dota_matches_bot - Shutdown: cancelling background tasks...
+[2025-12-12 23:53:54] [INFO] dota_matches_bot - Cancelling poll_task...
+[2025-12-12 23:53:54] [INFO] dota_matches_bot - Cancelling daily_task...
+[2025-12-12 23:53:54] [INFO] dota_matches_bot - Cancelling reminders_task...
+[2025-12-12 23:53:54] [INFO] dota_matches_bot - Поллер матчей остановлен (CancelledError)
+[2025-12-12 23:53:54] [INFO] dota_matches_bot - Ежедневный нотификатор остановлен (CancelledError)
+[2025-12-12 23:53:54] [INFO] dota_matches_bot - Таск напоминаний остановлен (CancelledError)
+[2025-12-12 23:53:55] [INFO] dota_matches_bot - Бот остановлен
+[2025-12-12 23:56:55] [INFO] dota_matches_bot - Логирование инициализировано
+[2025-12-12 23:56:55] [INFO] dota_matches_bot - MATCHES_API_BASE_URL = http://45.10.245.84:8050/dota/matches
+[2025-12-12 23:56:55] [INFO] dota_matches_bot - Запуск бота...
+[2025-12-12 23:56:55] [INFO] dota_matches_bot - Инициализация БД...
+[2025-12-12 23:56:56] [INFO] dota_matches_bot - БД и таблицы инициализированы.
+[2025-12-12 23:56:56] [INFO] dota_matches_bot - Старт фонового поллера матчей
+[2025-12-12 23:56:56] [INFO] dota_matches_bot - Старт ежедневного нотификатора (10:00 МСК, один раз в день)
+[2025-12-12 23:56:56] [INFO] dota_matches_bot - Старт таска напоминаний о матчах
+[2025-12-12 23:57:56] [INFO] dota_matches_bot - Поллер: обновляем матчи для дня 2025-12-12
+[2025-12-12 23:57:56] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/12-12-2025 для дня 2025-12-12
+[2025-12-12 23:57:57] [INFO] dota_matches_bot - Дедупликация: было 16 матчей, осталось 16
+[2025-12-12 23:57:57] [INFO] dota_matches_bot - Кэш обновлён: 16 матчей для 2025-12-12
+[2025-12-12 23:57:57] [INFO] dota_matches_bot - Поллер: из API получено матчей: 16
+[2025-12-12 23:57:58] [INFO] dota_matches_bot - Для дня 2025-12-12 найдено today-состояний: 3
+[2025-12-12 23:57:58] [INFO] dota_matches_bot - Для дня 2025-12-12 найдено today-состояний: 3
+[2025-12-12 23:58:01] [INFO] dota_matches_bot - Поллер: обновили today-сообщение в чате 177322935 (message_id=255, day=2025-12-12)
+[2025-12-12 23:58:02] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=177322935, day=2025-12-12, message_id=255
+[2025-12-12 23:58:02] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=177322935, day=2025-12-12, message_id=255
+[2025-12-12 23:58:02] [INFO] dota_matches_bot - Поллер: обновили today-сообщение в чате 88376478 (message_id=256, day=2025-12-12)
+[2025-12-12 23:58:04] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-12, message_id=256
+[2025-12-12 23:58:04] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-12, message_id=256
+[2025-12-12 23:58:04] [INFO] dota_matches_bot - Поллер: обновили today-сообщение в чате 590713900 (message_id=254, day=2025-12-12)
+[2025-12-12 23:58:05] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=590713900, day=2025-12-12, message_id=254
+[2025-12-12 23:58:05] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=590713900, day=2025-12-12, message_id=254
+[2025-12-12 23:59:05] [INFO] dota_matches_bot - Поллер: обновляем матчи для дня 2025-12-12
+[2025-12-12 23:59:05] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/12-12-2025 для дня 2025-12-12
+[2025-12-12 23:59:06] [INFO] dota_matches_bot - Дедупликация: было 16 матчей, осталось 16
+[2025-12-12 23:59:06] [INFO] dota_matches_bot - Кэш обновлён: 16 матчей для 2025-12-12
+[2025-12-12 23:59:06] [INFO] dota_matches_bot - Поллер: из API получено матчей: 16
+[2025-12-12 23:59:07] [INFO] dota_matches_bot - Для дня 2025-12-12 найдено today-состояний: 3
+[2025-12-12 23:59:07] [INFO] dota_matches_bot - Для дня 2025-12-12 найдено today-состояний: 3
+[2025-12-12 23:59:07] [INFO] dota_matches_bot - Поллер: обновили today-сообщение в чате 177322935 (message_id=255, day=2025-12-12)
+[2025-12-12 23:59:08] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=177322935, day=2025-12-12, message_id=255
+[2025-12-12 23:59:08] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=177322935, day=2025-12-12, message_id=255
+[2025-12-12 23:59:08] [INFO] dota_matches_bot - Поллер: обновили today-сообщение в чате 88376478 (message_id=256, day=2025-12-12)
+[2025-12-12 23:59:10] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-12, message_id=256
+[2025-12-12 23:59:10] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-12, message_id=256
+[2025-12-12 23:59:10] [INFO] dota_matches_bot - Поллер: обновили today-сообщение в чате 590713900 (message_id=254, day=2025-12-12)
+[2025-12-12 23:59:11] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=590713900, day=2025-12-12, message_id=254
+[2025-12-12 23:59:11] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=590713900, day=2025-12-12, message_id=254
+[2025-12-13 00:00:11] [INFO] dota_matches_bot - Поллер: обновляем матчи для дня 2025-12-13
+[2025-12-13 00:00:11] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/13-12-2025 для дня 2025-12-13
+[2025-12-13 00:00:12] [INFO] dota_matches_bot - Дедупликация: было 15 матчей, осталось 6
+[2025-12-13 00:00:12] [INFO] dota_matches_bot - Кэш обновлён: 6 матчей для 2025-12-13
+[2025-12-13 00:00:12] [INFO] dota_matches_bot - Поллер: из API получено матчей: 6
+[2025-12-13 00:00:13] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 0
+[2025-12-13 00:00:13] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 0
+[2025-12-13 00:01:13] [INFO] dota_matches_bot - Поллер: обновляем матчи для дня 2025-12-13
+[2025-12-13 00:01:13] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/13-12-2025 для дня 2025-12-13
+[2025-12-13 00:01:13] [INFO] dota_matches_bot - Дедупликация: было 15 матчей, осталось 6
+[2025-12-13 00:01:13] [INFO] dota_matches_bot - Кэш обновлён: 6 матчей для 2025-12-13
+[2025-12-13 00:01:13] [INFO] dota_matches_bot - Поллер: из API получено матчей: 6
+[2025-12-13 00:01:15] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 0
+[2025-12-13 00:01:15] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 0
+[2025-12-13 00:01:47] [INFO] dota_matches_bot - Shutdown: cancelling background tasks...
+[2025-12-13 00:01:47] [INFO] dota_matches_bot - Cancelling poll_task...
+[2025-12-13 00:01:47] [INFO] dota_matches_bot - Cancelling daily_task...
+[2025-12-13 00:01:47] [INFO] dota_matches_bot - Cancelling reminders_task...
+[2025-12-13 00:01:47] [INFO] dota_matches_bot - Поллер матчей остановлен (CancelledError)
+[2025-12-13 00:01:47] [INFO] dota_matches_bot - Ежедневный нотификатор остановлен (CancelledError)
+[2025-12-13 00:01:47] [INFO] dota_matches_bot - Таск напоминаний остановлен (CancelledError)
+[2025-12-13 00:01:48] [INFO] dota_matches_bot - Бот остановлен
+[2025-12-13 00:01:50] [INFO] dota_matches_bot - Логирование инициализировано
+[2025-12-13 00:01:50] [INFO] dota_matches_bot - MATCHES_API_BASE_URL = http://45.10.245.84:8050/dota/matches
+[2025-12-13 00:01:50] [INFO] dota_matches_bot - Запуск бота...
+[2025-12-13 00:01:50] [INFO] dota_matches_bot - Инициализация БД...
+[2025-12-13 00:01:51] [INFO] dota_matches_bot - БД и таблицы инициализированы.
+[2025-12-13 00:01:51] [INFO] dota_matches_bot - Старт фонового поллера матчей
+[2025-12-13 00:01:51] [INFO] dota_matches_bot - Старт ежедневного нотификатора (10:00 МСК, один раз в день)
+[2025-12-13 00:01:51] [INFO] dota_matches_bot - Старт таска напоминаний о матчах
+[2025-12-13 00:02:51] [INFO] dota_matches_bot - Поллер: обновляем матчи для дня 2025-12-13
+[2025-12-13 00:02:51] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/13-12-2025 для дня 2025-12-13
+[2025-12-13 00:02:52] [INFO] dota_matches_bot - Дедупликация: было 15 матчей, осталось 6
+[2025-12-13 00:02:52] [INFO] dota_matches_bot - Кэш обновлён: 6 матчей для 2025-12-13
+[2025-12-13 00:02:52] [INFO] dota_matches_bot - Поллер: из API получено матчей: 6
+[2025-12-13 00:02:53] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 0
+[2025-12-13 00:02:53] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 0
+[2025-12-13 00:03:23] [INFO] dota_matches_bot - Чат 88376478 добавлен в подписчики (или уже был).
+[2025-12-13 00:03:23] [INFO] dota_matches_bot - Команда /today от пользователя 88376478 в чате 88376478 для дня 2025-12-13
+[2025-12-13 00:03:23] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/13-12-2025 для дня 2025-12-13
+[2025-12-13 00:03:24] [INFO] dota_matches_bot - Дедупликация: было 15 матчей, осталось 6
+[2025-12-13 00:03:24] [INFO] dota_matches_bot - Кэш обновлён: 6 матчей для 2025-12-13
+[2025-12-13 00:03:24] [INFO] dota_matches_bot - Команда /today: из API получено матчей: 6
+[2025-12-13 00:03:25] [INFO] dota_matches_bot - Команда /today: состояния не было, создаём новое (chat_id=88376478, day=2025-12-13)
+[2025-12-13 00:03:27] [INFO] dota_matches_bot - Команда /today: отправили today-сообщение в чате 88376478 (message_id=261, day=2025-12-13)
+[2025-12-13 00:03:28] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:03:28] [INFO] dota_matches_bot - Поллер матчей уже запущен, новую задачу не создаём
+[2025-12-13 00:03:53] [INFO] dota_matches_bot - Поллер: обновляем матчи для дня 2025-12-13
+[2025-12-13 00:03:53] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/13-12-2025 для дня 2025-12-13
+[2025-12-13 00:03:53] [INFO] dota_matches_bot - Дедупликация: было 15 матчей, осталось 6
+[2025-12-13 00:03:53] [INFO] dota_matches_bot - Кэш обновлён: 6 матчей для 2025-12-13
+[2025-12-13 00:03:53] [INFO] dota_matches_bot - Поллер: из API получено матчей: 6
+[2025-12-13 00:03:54] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:03:54] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:03:54] [INFO] dota_matches_bot - Чат 88376478 / день 2025-12-13: текст не изменился, обновляем только клавиатуру
+[2025-12-13 00:03:54] [WARNING] dota_matches_bot - Не удалось обновить клавиатуру today-сообщения в чате 88376478: Telegram server says - Bad Request: message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message
+[2025-12-13 00:04:54] [INFO] dota_matches_bot - Поллер: обновляем матчи для дня 2025-12-13
+[2025-12-13 00:04:54] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/13-12-2025 для дня 2025-12-13
+[2025-12-13 00:04:55] [INFO] dota_matches_bot - Дедупликация: было 15 матчей, осталось 6
+[2025-12-13 00:04:55] [INFO] dota_matches_bot - Кэш обновлён: 6 матчей для 2025-12-13
+[2025-12-13 00:04:55] [INFO] dota_matches_bot - Поллер: из API получено матчей: 6
+[2025-12-13 00:04:56] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:04:56] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:04:56] [INFO] dota_matches_bot - Поллер: обновили today-сообщение в чате 88376478 (message_id=261, day=2025-12-13)
+[2025-12-13 00:04:57] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:04:57] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:05:40] [INFO] dota_matches_bot - Логирование инициализировано
+[2025-12-13 00:05:40] [INFO] dota_matches_bot - MATCHES_API_BASE_URL = http://45.10.245.84:8050/dota/matches
+[2025-12-13 00:05:40] [INFO] dota_matches_bot - Запуск бота...
+[2025-12-13 00:05:40] [INFO] dota_matches_bot - Инициализация БД...
+[2025-12-13 00:05:42] [INFO] dota_matches_bot - БД и таблицы инициализированы.
+[2025-12-13 00:05:42] [INFO] dota_matches_bot - Старт фонового поллера матчей
+[2025-12-13 00:05:42] [INFO] dota_matches_bot - Старт ежедневного нотификатора (10:00 МСК, один раз в день)
+[2025-12-13 00:05:42] [INFO] dota_matches_bot - Старт таска напоминаний о матчах
+[2025-12-13 00:06:42] [INFO] dota_matches_bot - Поллер: обновляем матчи для дня 2025-12-13
+[2025-12-13 00:06:42] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/13-12-2025 для дня 2025-12-13
+[2025-12-13 00:06:42] [INFO] dota_matches_bot - Дедупликация: было 15 матчей, осталось 6
+[2025-12-13 00:06:42] [INFO] dota_matches_bot - Кэш обновлён: 6 матчей для 2025-12-13
+[2025-12-13 00:06:42] [INFO] dota_matches_bot - Поллер: из API получено матчей: 6
+[2025-12-13 00:06:43] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:06:43] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:06:46] [INFO] dota_matches_bot - Поллер: обновили today-сообщение в чате 88376478 (message_id=261, day=2025-12-13)
+[2025-12-13 00:06:47] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:06:47] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:07:47] [INFO] dota_matches_bot - Поллер: обновляем матчи для дня 2025-12-13
+[2025-12-13 00:07:47] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/13-12-2025 для дня 2025-12-13
+[2025-12-13 00:07:47] [INFO] dota_matches_bot - Дедупликация: было 15 матчей, осталось 6
+[2025-12-13 00:07:47] [INFO] dota_matches_bot - Кэш обновлён: 6 матчей для 2025-12-13
+[2025-12-13 00:07:47] [INFO] dota_matches_bot - Поллер: из API получено матчей: 6
+[2025-12-13 00:07:49] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:07:49] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:07:50] [INFO] dota_matches_bot - Поллер: обновили today-сообщение в чате 88376478 (message_id=261, day=2025-12-13)
+[2025-12-13 00:07:52] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:07:52] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:08:52] [INFO] dota_matches_bot - Поллер: обновляем матчи для дня 2025-12-13
+[2025-12-13 00:08:52] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/13-12-2025 для дня 2025-12-13
+[2025-12-13 00:08:52] [INFO] dota_matches_bot - Дедупликация: было 15 матчей, осталось 6
+[2025-12-13 00:08:52] [INFO] dota_matches_bot - Кэш обновлён: 6 матчей для 2025-12-13
+[2025-12-13 00:08:52] [INFO] dota_matches_bot - Поллер: из API получено матчей: 6
+[2025-12-13 00:08:53] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:08:53] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:08:59] [INFO] dota_matches_bot - Поллер: обновили today-сообщение в чате 88376478 (message_id=261, day=2025-12-13)
+[2025-12-13 00:09:01] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:09:01] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:09:17] [INFO] dota_matches_bot - Shutdown: cancelling background tasks...
+[2025-12-13 00:09:17] [INFO] dota_matches_bot - Cancelling poll_task...
+[2025-12-13 00:09:17] [INFO] dota_matches_bot - Cancelling daily_task...
+[2025-12-13 00:09:17] [INFO] dota_matches_bot - Cancelling reminders_task...
+[2025-12-13 00:09:17] [INFO] dota_matches_bot - Поллер матчей остановлен (CancelledError)
+[2025-12-13 00:09:17] [INFO] dota_matches_bot - Ежедневный нотификатор остановлен (CancelledError)
+[2025-12-13 00:09:17] [INFO] dota_matches_bot - Таск напоминаний остановлен (CancelledError)
+[2025-12-13 00:09:18] [INFO] dota_matches_bot - Бот остановлен
+[2025-12-13 00:09:20] [INFO] dota_matches_bot - Логирование инициализировано
+[2025-12-13 00:09:20] [INFO] dota_matches_bot - MATCHES_API_BASE_URL = http://45.10.245.84:8050/dota/matches
+[2025-12-13 00:09:20] [INFO] dota_matches_bot - Запуск бота...
+[2025-12-13 00:09:20] [INFO] dota_matches_bot - Инициализация БД...
+[2025-12-13 00:09:21] [INFO] dota_matches_bot - БД и таблицы инициализированы.
+[2025-12-13 00:09:21] [INFO] dota_matches_bot - Старт фонового поллера матчей
+[2025-12-13 00:09:21] [INFO] dota_matches_bot - Старт ежедневного нотификатора (10:00 МСК, один раз в день)
+[2025-12-13 00:09:21] [INFO] dota_matches_bot - Старт таска напоминаний о матчах
+[2025-12-13 00:10:21] [INFO] dota_matches_bot - Поллер: обновляем матчи для дня 2025-12-13
+[2025-12-13 00:10:21] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/13-12-2025 для дня 2025-12-13
+[2025-12-13 00:10:22] [INFO] dota_matches_bot - Дедупликация: было 15 матчей, осталось 6
+[2025-12-13 00:10:22] [INFO] dota_matches_bot - Кэш обновлён: 6 матчей для 2025-12-13
+[2025-12-13 00:10:22] [INFO] dota_matches_bot - Поллер: из API получено матчей: 6
+[2025-12-13 00:10:23] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:10:23] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:10:23] [INFO] dota_matches_bot - Поллер: обновили today-сообщение в чате 88376478 (message_id=261, day=2025-12-13)
+[2025-12-13 00:10:24] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:10:24] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:11:24] [INFO] dota_matches_bot - Поллер: обновляем матчи для дня 2025-12-13
+[2025-12-13 00:11:24] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/13-12-2025 для дня 2025-12-13
+[2025-12-13 00:11:25] [INFO] dota_matches_bot - Дедупликация: было 15 матчей, осталось 6
+[2025-12-13 00:11:25] [INFO] dota_matches_bot - Кэш обновлён: 6 матчей для 2025-12-13
+[2025-12-13 00:11:25] [INFO] dota_matches_bot - Поллер: из API получено матчей: 6
+[2025-12-13 00:11:26] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:11:26] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:11:26] [INFO] dota_matches_bot - Поллер: обновили today-сообщение в чате 88376478 (message_id=261, day=2025-12-13)
+[2025-12-13 00:11:27] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:11:27] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:12:27] [INFO] dota_matches_bot - Поллер: обновляем матчи для дня 2025-12-13
+[2025-12-13 00:12:27] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/13-12-2025 для дня 2025-12-13
+[2025-12-13 00:12:28] [INFO] dota_matches_bot - Дедупликация: было 15 матчей, осталось 6
+[2025-12-13 00:12:28] [INFO] dota_matches_bot - Кэш обновлён: 6 матчей для 2025-12-13
+[2025-12-13 00:12:28] [INFO] dota_matches_bot - Поллер: из API получено матчей: 6
+[2025-12-13 00:12:29] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:12:29] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:12:29] [INFO] dota_matches_bot - Поллер: обновили today-сообщение в чате 88376478 (message_id=261, day=2025-12-13)
+[2025-12-13 00:12:31] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:12:31] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:13:31] [INFO] dota_matches_bot - Поллер: обновляем матчи для дня 2025-12-13
+[2025-12-13 00:13:31] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/13-12-2025 для дня 2025-12-13
+[2025-12-13 00:13:31] [INFO] dota_matches_bot - Дедупликация: было 15 матчей, осталось 6
+[2025-12-13 00:13:31] [INFO] dota_matches_bot - Кэш обновлён: 6 матчей для 2025-12-13
+[2025-12-13 00:13:31] [INFO] dota_matches_bot - Поллер: из API получено матчей: 6
+[2025-12-13 00:13:32] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:13:32] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:13:32] [INFO] dota_matches_bot - Поллер: обновили today-сообщение в чате 88376478 (message_id=261, day=2025-12-13)
+[2025-12-13 00:13:34] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:13:34] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:14:34] [INFO] dota_matches_bot - Поллер: обновляем матчи для дня 2025-12-13
+[2025-12-13 00:14:34] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/13-12-2025 для дня 2025-12-13
+[2025-12-13 00:14:34] [INFO] dota_matches_bot - Дедупликация: было 15 матчей, осталось 6
+[2025-12-13 00:14:34] [INFO] dota_matches_bot - Кэш обновлён: 6 матчей для 2025-12-13
+[2025-12-13 00:14:34] [INFO] dota_matches_bot - Поллер: из API получено матчей: 6
+[2025-12-13 00:14:35] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:14:35] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:14:35] [INFO] dota_matches_bot - Поллер: обновили today-сообщение в чате 88376478 (message_id=261, day=2025-12-13)
+[2025-12-13 00:14:37] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:14:37] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:15:37] [INFO] dota_matches_bot - Поллер: обновляем матчи для дня 2025-12-13
+[2025-12-13 00:15:37] [INFO] dota_matches_bot - Запрос матчей из API: http://45.10.245.84:8050/dota/matches/13-12-2025 для дня 2025-12-13
+[2025-12-13 00:15:37] [INFO] dota_matches_bot - Дедупликация: было 15 матчей, осталось 6
+[2025-12-13 00:15:37] [INFO] dota_matches_bot - Кэш обновлён: 6 матчей для 2025-12-13
+[2025-12-13 00:15:37] [INFO] dota_matches_bot - Поллер: из API получено матчей: 6
+[2025-12-13 00:15:38] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:15:38] [INFO] dota_matches_bot - Для дня 2025-12-13 найдено today-состояний: 1
+[2025-12-13 00:15:38] [INFO] dota_matches_bot - Поллер: обновили today-сообщение в чате 88376478 (message_id=261, day=2025-12-13)
+[2025-12-13 00:15:40] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:15:40] [INFO] dota_matches_bot - Состояние today-сообщения сохранено: chat_id=88376478, day=2025-12-13, message_id=261
+[2025-12-13 00:15:43] [INFO] dota_matches_bot - Shutdown: cancelling background tasks...
+[2025-12-13 00:15:43] [INFO] dota_matches_bot - Cancelling poll_task...
+[2025-12-13 00:15:43] [INFO] dota_matches_bot - Cancelling daily_task...
+[2025-12-13 00:15:43] [INFO] dota_matches_bot - Cancelling reminders_task...
+[2025-12-13 00:15:43] [INFO] dota_matches_bot - Поллер матчей остановлен (CancelledError)
+[2025-12-13 00:15:43] [INFO] dota_matches_bot - Ежедневный нотификатор остановлен (CancelledError)
+[2025-12-13 00:15:43] [INFO] dota_matches_bot - Таск напоминаний остановлен (CancelledError)
+[2025-12-13 00:15:43] [INFO] dota_matches_bot - Бот остановлен
+[2025-12-14 18:18:03] [INFO] matches_bot - Логирование инициализировано
+[2025-12-14 18:18:03] [INFO] matches_bot - DOTA_MATCHES_API_BASE_URL = http://45.10.245.84:8050/dota/matches
+[2025-12-14 18:18:03] [INFO] matches_bot - CS2_MATCHES_API_BASE_URL  = http://45.10.245.84:8050/cs2/matches
+[2025-12-14 18:18:03] [INFO] matches_bot - Запуск бота...
+[2025-12-14 18:18:03] [INFO] matches_bot - Инициализация БД...
+[2025-12-14 18:18:06] [INFO] matches_bot - БД и таблицы инициализированы.
+[2025-12-14 18:18:06] [INFO] matches_bot - Старт фонового поллера матчей
+[2025-12-14 18:18:06] [INFO] matches_bot - Старт ежедневного нотификатора (10:00 МСК, один раз в день)
+[2025-12-14 18:18:06] [INFO] matches_bot - Старт таска напоминаний о матчах
+[2025-12-14 18:19:06] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://45.10.245.84:8050/dota/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:19:16] [INFO] matches_bot - Дедупликация: было 20 матчей, осталось 20
+[2025-12-14 18:19:16] [INFO] matches_bot - Кэш обновлён: 20 матчей для dota/2025-12-14
+[2025-12-14 18:19:18] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://45.10.245.84:8050/cs2/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:19:19] [WARNING] matches_bot - Ошибка запроса (попытка 1/4): 404, message='Not Found', url='http://45.10.245.84:8050/cs2/matches/14-12-2025'. Повтор через 1.0 сек.
+[2025-12-14 18:19:20] [WARNING] matches_bot - Ошибка запроса (попытка 2/4): 404, message='Not Found', url='http://45.10.245.84:8050/cs2/matches/14-12-2025'. Повтор через 2.0 сек.
+[2025-12-14 18:19:23] [WARNING] matches_bot - Ошибка запроса (попытка 3/4): 404, message='Not Found', url='http://45.10.245.84:8050/cs2/matches/14-12-2025'. Повтор через 4.0 сек.
+[2025-12-14 18:19:27] [ERROR] matches_bot - Все попытки исчерпаны для http://45.10.245.84:8050/cs2/matches/14-12-2025: 404, message='Not Found', url='http://45.10.245.84:8050/cs2/matches/14-12-2025'
+Traceback (most recent call last):
+  File "/Users/shaneque/Documents/DEVELOP/CyberMatches/cyber_telegram_bot.py", line 576, in fetch_with_retry
+    resp.raise_for_status()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/shaneque/Documents/DEVELOP/CyberMatches/.venv/lib/python3.13/site-packages/aiohttp/client_reqrep.py", line 629, in raise_for_status
+    raise ClientResponseError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.ClientResponseError: 404, message='Not Found', url='http://45.10.245.84:8050/cs2/matches/14-12-2025'
+[2025-12-14 18:19:33] [INFO] matches_bot - Shutdown: cancelling background tasks...
+[2025-12-14 18:19:33] [INFO] matches_bot - Cancelling poll_task...
+[2025-12-14 18:19:33] [INFO] matches_bot - Cancelling daily_task...
+[2025-12-14 18:19:33] [INFO] matches_bot - Cancelling reminders_task...
+[2025-12-14 18:19:33] [INFO] matches_bot - Поллер матчей остановлен (CancelledError)
+[2025-12-14 18:19:33] [INFO] matches_bot - Ежедневный нотификатор остановлен (CancelledError)
+[2025-12-14 18:19:33] [INFO] matches_bot - Таск напоминаний остановлен (CancelledError)
+[2025-12-14 18:19:33] [INFO] matches_bot - Бот остановлен
+[2025-12-14 18:20:37] [INFO] matches_bot - Логирование инициализировано
+[2025-12-14 18:20:37] [INFO] matches_bot - DOTA_MATCHES_API_BASE_URL = http://cyber-api.solar.shaneque.ru/dota/matches/
+[2025-12-14 18:20:37] [INFO] matches_bot - CS2_MATCHES_API_BASE_URL  = http://cyber-api.solar.shaneque.ru/cs2/matches/
+[2025-12-14 18:20:37] [INFO] matches_bot - Запуск бота...
+[2025-12-14 18:20:37] [INFO] matches_bot - Инициализация БД...
+[2025-12-14 18:20:39] [INFO] matches_bot - БД и таблицы инициализированы.
+[2025-12-14 18:20:39] [INFO] matches_bot - Старт фонового поллера матчей
+[2025-12-14 18:20:39] [INFO] matches_bot - Старт ежедневного нотификатора (10:00 МСК, один раз в день)
+[2025-12-14 18:20:39] [INFO] matches_bot - Старт таска напоминаний о матчах
+[2025-12-14 18:21:16] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches//14-12-2025 day=2025-12-14
+[2025-12-14 18:21:17] [WARNING] matches_bot - Ошибка запроса (попытка 1/4): 404, message='Not Found', url='http://cyber-api.solar.shaneque.ru/dota/matches//14-12-2025'. Повтор через 1.0 сек.
+[2025-12-14 18:21:18] [WARNING] matches_bot - Ошибка запроса (попытка 2/4): 404, message='Not Found', url='http://cyber-api.solar.shaneque.ru/dota/matches//14-12-2025'. Повтор через 2.0 сек.
+[2025-12-14 18:21:22] [WARNING] matches_bot - Ошибка запроса (попытка 3/4): 404, message='Not Found', url='http://cyber-api.solar.shaneque.ru/dota/matches//14-12-2025'. Повтор через 4.0 сек.
+[2025-12-14 18:21:26] [ERROR] matches_bot - Все попытки исчерпаны для http://cyber-api.solar.shaneque.ru/dota/matches//14-12-2025: 404, message='Not Found', url='http://cyber-api.solar.shaneque.ru/dota/matches//14-12-2025'
+Traceback (most recent call last):
+  File "/Users/shaneque/Documents/DEVELOP/CyberMatches/cyber_telegram_bot.py", line 576, in fetch_with_retry
+    resp.raise_for_status()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/shaneque/Documents/DEVELOP/CyberMatches/.venv/lib/python3.13/site-packages/aiohttp/client_reqrep.py", line 629, in raise_for_status
+    raise ClientResponseError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.ClientResponseError: 404, message='Not Found', url='http://cyber-api.solar.shaneque.ru/dota/matches//14-12-2025'
+[2025-12-14 18:21:29] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches//14-12-2025 day=2025-12-14
+[2025-12-14 18:21:31] [WARNING] matches_bot - Ошибка запроса (попытка 1/4): 404, message='Not Found', url='http://cyber-api.solar.shaneque.ru/cs2/matches//14-12-2025'. Повтор через 1.0 сек.
+[2025-12-14 18:21:32] [WARNING] matches_bot - Ошибка запроса (попытка 2/4): 404, message='Not Found', url='http://cyber-api.solar.shaneque.ru/cs2/matches//14-12-2025'. Повтор через 2.0 сек.
+[2025-12-14 18:21:34] [WARNING] matches_bot - Ошибка запроса (попытка 3/4): 404, message='Not Found', url='http://cyber-api.solar.shaneque.ru/cs2/matches//14-12-2025'. Повтор через 4.0 сек.
+[2025-12-14 18:21:39] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches//14-12-2025 day=2025-12-14
+[2025-12-14 18:21:39] [ERROR] matches_bot - Все попытки исчерпаны для http://cyber-api.solar.shaneque.ru/cs2/matches//14-12-2025: 404, message='Not Found', url='http://cyber-api.solar.shaneque.ru/cs2/matches//14-12-2025'
+Traceback (most recent call last):
+  File "/Users/shaneque/Documents/DEVELOP/CyberMatches/cyber_telegram_bot.py", line 576, in fetch_with_retry
+    resp.raise_for_status()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/shaneque/Documents/DEVELOP/CyberMatches/.venv/lib/python3.13/site-packages/aiohttp/client_reqrep.py", line 629, in raise_for_status
+    raise ClientResponseError(
+    ...<5 lines>...
+    )
+aiohttp.client_exceptions.ClientResponseError: 404, message='Not Found', url='http://cyber-api.solar.shaneque.ru/cs2/matches//14-12-2025'
+[2025-12-14 18:21:40] [WARNING] matches_bot - Ошибка запроса (попытка 1/4): 404, message='Not Found', url='http://cyber-api.solar.shaneque.ru/dota/matches//14-12-2025'. Повтор через 1.0 сек.
+[2025-12-14 18:21:47] [WARNING] matches_bot - Ошибка запроса (попытка 2/4): 404, message='Not Found', url='http://cyber-api.solar.shaneque.ru/dota/matches//14-12-2025'. Повтор через 2.0 сек.
+[2025-12-14 18:21:47] [INFO] matches_bot - Shutdown: cancelling background tasks...
+[2025-12-14 18:21:47] [INFO] matches_bot - Cancelling poll_task...
+[2025-12-14 18:21:47] [INFO] matches_bot - Cancelling daily_task...
+[2025-12-14 18:21:47] [INFO] matches_bot - Cancelling reminders_task...
+[2025-12-14 18:21:47] [INFO] matches_bot - Поллер матчей остановлен (CancelledError)
+[2025-12-14 18:21:47] [INFO] matches_bot - Ежедневный нотификатор остановлен (CancelledError)
+[2025-12-14 18:21:47] [INFO] matches_bot - Таск напоминаний остановлен (CancelledError)
+[2025-12-14 18:25:31] [INFO] matches_bot - Логирование инициализировано
+[2025-12-14 18:25:31] [INFO] matches_bot - DOTA_MATCHES_API_BASE_URL = http://cyber-api.solar.shaneque.ru/dota/matches
+[2025-12-14 18:25:31] [INFO] matches_bot - CS2_MATCHES_API_BASE_URL  = http://cyber-api.solar.shaneque.ru/cs2/matches
+[2025-12-14 18:25:31] [INFO] matches_bot - Запуск бота...
+[2025-12-14 18:25:31] [INFO] matches_bot - Инициализация БД...
+[2025-12-14 18:25:33] [INFO] matches_bot - БД и таблицы инициализированы.
+[2025-12-14 18:25:33] [INFO] matches_bot - Старт фонового поллера матчей
+[2025-12-14 18:25:33] [INFO] matches_bot - Старт ежедневного нотификатора (10:00 МСК, один раз в день)
+[2025-12-14 18:25:33] [INFO] matches_bot - Старт таска напоминаний о матчах
+[2025-12-14 18:26:33] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:26:33] [INFO] matches_bot - Дедупликация: было 20 матчей, осталось 20
+[2025-12-14 18:26:33] [INFO] matches_bot - Кэш обновлён: 20 матчей для dota/2025-12-14
+[2025-12-14 18:26:34] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=dota
+[2025-12-14 18:26:37] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:26:43] [INFO] matches_bot - Дедупликация: было 3 матчей, осталось 3
+[2025-12-14 18:26:43] [INFO] matches_bot - Кэш обновлён: 3 матчей для cs2/2025-12-14
+[2025-12-14 18:26:44] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=cs2
+[2025-12-14 18:26:44] [WARNING] matches_bot - Не удалось обновить today-сообщение chat=88376478 day=2025-12-14 game=cs2: Telegram server says - Bad Request: BUTTON_DATA_INVALID
+[2025-12-14 18:27:45] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:27:46] [INFO] matches_bot - Дедупликация: было 20 матчей, осталось 20
+[2025-12-14 18:27:46] [INFO] matches_bot - Кэш обновлён: 20 матчей для dota/2025-12-14
+[2025-12-14 18:27:47] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=dota
+[2025-12-14 18:27:53] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:27:54] [INFO] matches_bot - Дедупликация: было 3 матчей, осталось 3
+[2025-12-14 18:27:54] [INFO] matches_bot - Кэш обновлён: 3 матчей для cs2/2025-12-14
+[2025-12-14 18:27:55] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=cs2
+[2025-12-14 18:27:55] [WARNING] matches_bot - Не удалось обновить today-сообщение chat=88376478 day=2025-12-14 game=cs2: Telegram server says - Bad Request: BUTTON_DATA_INVALID
+[2025-12-14 18:28:49] [INFO] matches_bot - Shutdown: cancelling background tasks...
+[2025-12-14 18:28:49] [INFO] matches_bot - Cancelling poll_task...
+[2025-12-14 18:28:49] [INFO] matches_bot - Cancelling daily_task...
+[2025-12-14 18:28:49] [INFO] matches_bot - Cancelling reminders_task...
+[2025-12-14 18:28:49] [INFO] matches_bot - Поллер матчей остановлен (CancelledError)
+[2025-12-14 18:28:49] [INFO] matches_bot - Ежедневный нотификатор остановлен (CancelledError)
+[2025-12-14 18:28:49] [INFO] matches_bot - Таск напоминаний остановлен (CancelledError)
+[2025-12-14 18:28:50] [INFO] matches_bot - Бот остановлен
+[2025-12-14 18:28:52] [INFO] matches_bot - Логирование инициализировано
+[2025-12-14 18:28:52] [INFO] matches_bot - DOTA_MATCHES_API_BASE_URL = http://cyber-api.solar.shaneque.ru/dota/matches
+[2025-12-14 18:28:52] [INFO] matches_bot - CS2_MATCHES_API_BASE_URL  = http://cyber-api.solar.shaneque.ru/cs2/matches
+[2025-12-14 18:28:52] [INFO] matches_bot - Запуск бота...
+[2025-12-14 18:28:52] [INFO] matches_bot - Инициализация БД...
+[2025-12-14 18:28:54] [INFO] matches_bot - БД и таблицы инициализированы.
+[2025-12-14 18:28:54] [INFO] matches_bot - Старт фонового поллера матчей
+[2025-12-14 18:28:54] [INFO] matches_bot - Старт ежедневного нотификатора (10:00 МСК, один раз в день)
+[2025-12-14 18:28:54] [INFO] matches_bot - Старт таска напоминаний о матчах
+[2025-12-14 18:29:23] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:29:23] [INFO] matches_bot - Дедупликация: было 20 матчей, осталось 20
+[2025-12-14 18:29:23] [INFO] matches_bot - Кэш обновлён: 20 матчей для dota/2025-12-14
+[2025-12-14 18:29:30] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:29:30] [INFO] matches_bot - Дедупликация: было 3 матчей, осталось 3
+[2025-12-14 18:29:30] [INFO] matches_bot - Кэш обновлён: 3 матчей для cs2/2025-12-14
+[2025-12-14 18:29:54] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:29:54] [INFO] matches_bot - Дедупликация: было 20 матчей, осталось 20
+[2025-12-14 18:29:54] [INFO] matches_bot - Кэш обновлён: 20 матчей для dota/2025-12-14
+[2025-12-14 18:29:55] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=dota
+[2025-12-14 18:29:57] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:29:58] [INFO] matches_bot - Дедупликация: было 3 матчей, осталось 3
+[2025-12-14 18:29:58] [INFO] matches_bot - Кэш обновлён: 3 матчей для cs2/2025-12-14
+[2025-12-14 18:30:00] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=cs2
+[2025-12-14 18:30:03] [WARNING] matches_bot - Не удалось обновить today-сообщение chat=88376478 day=2025-12-14 game=cs2: Telegram server says - Bad Request: BUTTON_DATA_INVALID
+[2025-12-14 18:31:04] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:31:05] [INFO] matches_bot - Дедупликация: было 20 матчей, осталось 20
+[2025-12-14 18:31:05] [INFO] matches_bot - Кэш обновлён: 20 матчей для dota/2025-12-14
+[2025-12-14 18:31:06] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=dota
+[2025-12-14 18:31:09] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:31:13] [INFO] matches_bot - Дедупликация: было 3 матчей, осталось 3
+[2025-12-14 18:31:13] [INFO] matches_bot - Кэш обновлён: 3 матчей для cs2/2025-12-14
+[2025-12-14 18:31:14] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=cs2
+[2025-12-14 18:31:14] [WARNING] matches_bot - Не удалось обновить today-сообщение chat=88376478 day=2025-12-14 game=cs2: Telegram server says - Bad Request: BUTTON_DATA_INVALID
+[2025-12-14 18:32:15] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:32:16] [INFO] matches_bot - Дедупликация: было 20 матчей, осталось 20
+[2025-12-14 18:32:16] [INFO] matches_bot - Кэш обновлён: 20 матчей для dota/2025-12-14
+[2025-12-14 18:32:17] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=dota
+[2025-12-14 18:32:24] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:32:24] [INFO] matches_bot - Дедупликация: было 3 матчей, осталось 3
+[2025-12-14 18:32:24] [INFO] matches_bot - Кэш обновлён: 3 матчей для cs2/2025-12-14
+[2025-12-14 18:32:25] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=cs2
+[2025-12-14 18:32:26] [WARNING] matches_bot - Не удалось обновить today-сообщение chat=88376478 day=2025-12-14 game=cs2: Telegram server says - Bad Request: BUTTON_DATA_INVALID
+[2025-12-14 18:33:29] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:33:29] [INFO] matches_bot - Дедупликация: было 20 матчей, осталось 20
+[2025-12-14 18:33:29] [INFO] matches_bot - Кэш обновлён: 20 матчей для dota/2025-12-14
+[2025-12-14 18:33:30] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=dota
+[2025-12-14 18:33:38] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:33:40] [INFO] matches_bot - Дедупликация: было 3 матчей, осталось 3
+[2025-12-14 18:33:40] [INFO] matches_bot - Кэш обновлён: 3 матчей для cs2/2025-12-14
+[2025-12-14 18:33:41] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=cs2
+[2025-12-14 18:33:41] [WARNING] matches_bot - Не удалось обновить today-сообщение chat=88376478 day=2025-12-14 game=cs2: Telegram server says - Bad Request: BUTTON_DATA_INVALID
+[2025-12-14 18:34:43] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:34:43] [INFO] matches_bot - Дедупликация: было 20 матчей, осталось 20
+[2025-12-14 18:34:43] [INFO] matches_bot - Кэш обновлён: 20 матчей для dota/2025-12-14
+[2025-12-14 18:34:44] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=dota
+[2025-12-14 18:34:47] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:34:49] [INFO] matches_bot - Дедупликация: было 3 матчей, осталось 3
+[2025-12-14 18:34:49] [INFO] matches_bot - Кэш обновлён: 3 матчей для cs2/2025-12-14
+[2025-12-14 18:34:50] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=cs2
+[2025-12-14 18:34:50] [WARNING] matches_bot - Не удалось обновить today-сообщение chat=88376478 day=2025-12-14 game=cs2: Telegram server says - Bad Request: BUTTON_DATA_INVALID
+[2025-12-14 18:35:51] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:35:52] [INFO] matches_bot - Дедупликация: было 20 матчей, осталось 20
+[2025-12-14 18:35:52] [INFO] matches_bot - Кэш обновлён: 20 матчей для dota/2025-12-14
+[2025-12-14 18:35:53] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=dota
+[2025-12-14 18:35:57] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:35:57] [INFO] matches_bot - Дедупликация: было 3 матчей, осталось 3
+[2025-12-14 18:35:57] [INFO] matches_bot - Кэш обновлён: 3 матчей для cs2/2025-12-14
+[2025-12-14 18:35:59] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=cs2
+[2025-12-14 18:35:59] [WARNING] matches_bot - Не удалось обновить today-сообщение chat=88376478 day=2025-12-14 game=cs2: Telegram server says - Bad Request: BUTTON_DATA_INVALID
+[2025-12-14 18:37:00] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:37:00] [INFO] matches_bot - Дедупликация: было 20 матчей, осталось 20
+[2025-12-14 18:37:00] [INFO] matches_bot - Кэш обновлён: 20 матчей для dota/2025-12-14
+[2025-12-14 18:37:02] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=dota
+[2025-12-14 18:37:05] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:37:06] [INFO] matches_bot - Дедупликация: было 3 матчей, осталось 3
+[2025-12-14 18:37:06] [INFO] matches_bot - Кэш обновлён: 3 матчей для cs2/2025-12-14
+[2025-12-14 18:37:07] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=cs2
+[2025-12-14 18:37:07] [WARNING] matches_bot - Не удалось обновить today-сообщение chat=88376478 day=2025-12-14 game=cs2: Telegram server says - Bad Request: BUTTON_DATA_INVALID
+[2025-12-14 18:37:59] [INFO] matches_bot - Shutdown: cancelling background tasks...
+[2025-12-14 18:37:59] [INFO] matches_bot - Cancelling poll_task...
+[2025-12-14 18:37:59] [INFO] matches_bot - Cancelling daily_task...
+[2025-12-14 18:37:59] [INFO] matches_bot - Cancelling reminders_task...
+[2025-12-14 18:37:59] [INFO] matches_bot - Поллер матчей остановлен (CancelledError)
+[2025-12-14 18:37:59] [INFO] matches_bot - Ежедневный нотификатор остановлен (CancelledError)
+[2025-12-14 18:37:59] [INFO] matches_bot - Таск напоминаний остановлен (CancelledError)
+[2025-12-14 18:38:00] [INFO] matches_bot - Бот остановлен
+[2025-12-14 18:38:02] [INFO] matches_bot - Логирование инициализировано
+[2025-12-14 18:38:02] [INFO] matches_bot - DOTA_MATCHES_API_BASE_URL = http://cyber-api.solar.shaneque.ru/dota/matches
+[2025-12-14 18:38:02] [INFO] matches_bot - CS2_MATCHES_API_BASE_URL  = http://cyber-api.solar.shaneque.ru/cs2/matches
+[2025-12-14 18:38:02] [INFO] matches_bot - Запуск бота...
+[2025-12-14 18:38:02] [INFO] matches_bot - Инициализация БД...
+[2025-12-14 18:38:04] [INFO] matches_bot - БД и таблицы инициализированы.
+[2025-12-14 18:38:04] [INFO] matches_bot - Старт фонового поллера матчей
+[2025-12-14 18:38:04] [INFO] matches_bot - Старт ежедневного нотификатора (10:00 МСК, один раз в день)
+[2025-12-14 18:38:04] [INFO] matches_bot - Старт таска напоминаний о матчах
+[2025-12-14 18:39:04] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:39:05] [INFO] matches_bot - Дедупликация: было 20 матчей, осталось 20
+[2025-12-14 18:39:05] [INFO] matches_bot - Кэш обновлён: 20 матчей для dota/2025-12-14
+[2025-12-14 18:39:06] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=dota
+[2025-12-14 18:39:20] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:39:20] [INFO] matches_bot - Дедупликация: было 3 матчей, осталось 3
+[2025-12-14 18:39:20] [INFO] matches_bot - Кэш обновлён: 3 матчей для cs2/2025-12-14
+[2025-12-14 18:39:22] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=cs2
+[2025-12-14 18:40:28] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:40:33] [INFO] matches_bot - Дедупликация: было 20 матчей, осталось 20
+[2025-12-14 18:40:33] [INFO] matches_bot - Кэш обновлён: 20 матчей для dota/2025-12-14
+[2025-12-14 18:40:35] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=dota
+[2025-12-14 18:40:46] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:40:46] [INFO] matches_bot - Дедупликация: было 20 матчей, осталось 20
+[2025-12-14 18:40:46] [INFO] matches_bot - Кэш обновлён: 20 матчей для dota/2025-12-14
+[2025-12-14 18:41:03] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:41:15] [WARNING] matches_bot - Ошибка запроса (попытка 1/4): . Повтор через 1.0 сек.
+[2025-12-14 18:41:20] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:41:21] [INFO] matches_bot - Дедупликация: было 3 матчей, осталось 3
+[2025-12-14 18:41:21] [INFO] matches_bot - Кэш обновлён: 3 матчей для cs2/2025-12-14
+[2025-12-14 18:41:27] [INFO] matches_bot - Дедупликация: было 3 матчей, осталось 3
+[2025-12-14 18:41:27] [INFO] matches_bot - Кэш обновлён: 3 матчей для cs2/2025-12-14
+[2025-12-14 18:41:31] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=cs2
+[2025-12-14 18:42:50] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/14-12-2025 day=2025-12-14
+[2025-12-14 18:42:51] [INFO] matches_bot - Дедупликация: было 20 матчей, осталось 20
+[2025-12-14 18:42:51] [INFO] matches_bot - Кэш обновлён: 20 матчей для dota/2025-12-14
+[2025-12-14 18:42:53] [INFO] matches_bot - Поллер: обновляем 1 сообщений для дня 2025-12-14 game=dota
+[2025-12-16 23:12:26] [INFO] matches_bot - Логирование инициализировано
+[2025-12-16 23:12:26] [INFO] matches_bot - DOTA_MATCHES_API_BASE_URL = http://cyber-api.solar.shaneque.ru/dota/matches
+[2025-12-16 23:12:26] [INFO] matches_bot - CS2_MATCHES_API_BASE_URL  = http://cyber-api.solar.shaneque.ru/cs2/matches
+[2025-12-16 23:12:26] [INFO] matches_bot - Запуск бота...
+[2025-12-16 23:12:26] [INFO] matches_bot - Инициализация БД...
+[2025-12-16 23:12:27] [INFO] matches_bot - БД и таблицы инициализированы.
+[2025-12-16 23:12:27] [INFO] matches_bot - Старт фонового поллера матчей
+[2025-12-16 23:12:27] [INFO] matches_bot - Старт ежедневного нотификатора (10:00 МСК, один раз в день)
+[2025-12-16 23:12:27] [INFO] matches_bot - Старт таска напоминаний о матчах
+[2025-12-16 23:13:27] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/16-12-2025 day=2025-12-16
+[2025-12-16 23:13:35] [INFO] matches_bot - Дедупликация: было 4 матчей, осталось 4
+[2025-12-16 23:13:35] [INFO] matches_bot - Кэш обновлён: 4 матчей для dota/2025-12-16
+[2025-12-16 23:13:35] [INFO] matches_bot - Поллер: обновляем 4 сообщений для дня 2025-12-16 game=dota
+[2025-12-16 23:13:35] [ERROR] matches_bot - Ошибка в поллере матчей: build_core_text() missing 1 required positional argument: 'game'
+Traceback (most recent call last):
+  File "/Users/shaneque/Documents/DEVELOP/CyberMatches/cyber_telegram_bot.py", line 1086, in poll_matches
+    await _update_today_states_for_day(bot, game, today, today_matches)
+  File "/Users/shaneque/Documents/DEVELOP/CyberMatches/cyber_telegram_bot.py", line 1023, in _update_today_states_for_day
+    core = build_core_text(filtered_matches, day, game)
+TypeError: build_core_text() missing 1 required positional argument: 'game'
+[2025-12-16 23:14:03] [INFO] matches_bot - Shutdown: cancelling background tasks...
+[2025-12-16 23:14:03] [INFO] matches_bot - Cancelling poll_task...
+[2025-12-16 23:14:03] [INFO] matches_bot - Cancelling daily_task...
+[2025-12-16 23:14:03] [INFO] matches_bot - Cancelling reminders_task...
+[2025-12-16 23:14:03] [INFO] matches_bot - Поллер матчей остановлен (CancelledError)
+[2025-12-16 23:14:03] [INFO] matches_bot - Ежедневный нотификатор остановлен (CancelledError)
+[2025-12-16 23:14:03] [INFO] matches_bot - Таск напоминаний остановлен (CancelledError)
+[2025-12-16 23:14:04] [INFO] matches_bot - Бот остановлен
+[2025-12-16 23:14:05] [INFO] matches_bot - Логирование инициализировано
+[2025-12-16 23:14:05] [INFO] matches_bot - DOTA_MATCHES_API_BASE_URL = http://cyber-api.solar.shaneque.ru/dota/matches
+[2025-12-16 23:14:05] [INFO] matches_bot - CS2_MATCHES_API_BASE_URL  = http://cyber-api.solar.shaneque.ru/cs2/matches
+[2025-12-16 23:14:05] [INFO] matches_bot - Запуск бота...
+[2025-12-16 23:14:05] [INFO] matches_bot - Инициализация БД...
+[2025-12-16 23:14:06] [INFO] matches_bot - БД и таблицы инициализированы.
+[2025-12-16 23:14:06] [INFO] matches_bot - Старт фонового поллера матчей
+[2025-12-16 23:14:06] [INFO] matches_bot - Старт ежедневного нотификатора (10:00 МСК, один раз в день)
+[2025-12-16 23:14:06] [INFO] matches_bot - Старт таска напоминаний о матчах
+[2025-12-16 23:15:06] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/16-12-2025 day=2025-12-16
+[2025-12-16 23:15:12] [INFO] matches_bot - Дедупликация: было 4 матчей, осталось 4
+[2025-12-16 23:15:12] [INFO] matches_bot - Кэш обновлён: 4 матчей для dota/2025-12-16
+[2025-12-16 23:15:12] [INFO] matches_bot - Поллер: обновляем 4 сообщений для дня 2025-12-16 game=dota
+[2025-12-16 23:15:12] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/15-12-2025 day=2025-12-15
+[2025-12-16 23:15:20] [INFO] matches_bot - Дедупликация: было 18 матчей, осталось 18
+[2025-12-16 23:15:20] [INFO] matches_bot - Кэш обновлён: 18 матчей для dota/2025-12-15
+[2025-12-16 23:15:20] [INFO] matches_bot - День 2025-12-15 (dota) закрыт и не today — пропускаем апдейты
+[2025-12-16 23:15:20] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/16-12-2025 day=2025-12-16
+[2025-12-16 23:15:20] [INFO] matches_bot - Дедупликация: было 8 матчей, осталось 4
+[2025-12-16 23:15:20] [INFO] matches_bot - Кэш обновлён: 4 матчей для cs2/2025-12-16
+[2025-12-16 23:15:20] [INFO] matches_bot - Поллер: обновляем 3 сообщений для дня 2025-12-16 game=cs2
+[2025-12-16 23:15:21] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/15-12-2025 day=2025-12-15
+[2025-12-16 23:15:21] [INFO] matches_bot - Дедупликация: было 0 матчей, осталось 0
+[2025-12-16 23:15:21] [INFO] matches_bot - Кэш обновлён: 0 матчей для cs2/2025-12-15
+[2025-12-16 23:15:21] [INFO] matches_bot - День 2025-12-15 (cs2) закрыт и не today — пропускаем апдейты
+[2025-12-16 23:16:21] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/16-12-2025 day=2025-12-16
+[2025-12-16 23:16:24] [INFO] matches_bot - Дедупликация: было 4 матчей, осталось 4
+[2025-12-16 23:16:24] [INFO] matches_bot - Кэш обновлён: 4 матчей для dota/2025-12-16
+[2025-12-16 23:16:24] [INFO] matches_bot - Поллер: обновляем 4 сообщений для дня 2025-12-16 game=dota
+[2025-12-16 23:16:24] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/15-12-2025 day=2025-12-15
+[2025-12-16 23:16:27] [INFO] matches_bot - Дедупликация: было 18 матчей, осталось 18
+[2025-12-16 23:16:27] [INFO] matches_bot - Кэш обновлён: 18 матчей для dota/2025-12-15
+[2025-12-16 23:16:27] [INFO] matches_bot - День 2025-12-15 (dota) закрыт и не today — пропускаем апдейты
+[2025-12-16 23:16:27] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/16-12-2025 day=2025-12-16
+[2025-12-16 23:16:27] [INFO] matches_bot - Дедупликация: было 8 матчей, осталось 4
+[2025-12-16 23:16:27] [INFO] matches_bot - Кэш обновлён: 4 матчей для cs2/2025-12-16
+[2025-12-16 23:16:28] [INFO] matches_bot - Поллер: обновляем 3 сообщений для дня 2025-12-16 game=cs2
+[2025-12-16 23:16:28] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/15-12-2025 day=2025-12-15
+[2025-12-16 23:16:28] [INFO] matches_bot - Дедупликация: было 0 матчей, осталось 0
+[2025-12-16 23:16:28] [INFO] matches_bot - Кэш обновлён: 0 матчей для cs2/2025-12-15
+[2025-12-16 23:16:28] [INFO] matches_bot - День 2025-12-15 (cs2) закрыт и не today — пропускаем апдейты
+[2025-12-16 23:16:36] [INFO] matches_bot - Shutdown: cancelling background tasks...
+[2025-12-16 23:16:36] [INFO] matches_bot - Cancelling poll_task...
+[2025-12-16 23:16:36] [INFO] matches_bot - Cancelling daily_task...
+[2025-12-16 23:16:36] [INFO] matches_bot - Cancelling reminders_task...
+[2025-12-16 23:16:36] [INFO] matches_bot - Поллер матчей остановлен (CancelledError)
+[2025-12-16 23:16:36] [INFO] matches_bot - Ежедневный нотификатор остановлен (CancelledError)
+[2025-12-16 23:16:36] [INFO] matches_bot - Таск напоминаний остановлен (CancelledError)
+[2025-12-16 23:16:37] [INFO] matches_bot - Бот остановлен
+[2025-12-16 23:16:39] [INFO] matches_bot - Логирование инициализировано
+[2025-12-16 23:16:39] [INFO] matches_bot - DOTA_MATCHES_API_BASE_URL = http://cyber-api.solar.shaneque.ru/dota/matches
+[2025-12-16 23:16:39] [INFO] matches_bot - CS2_MATCHES_API_BASE_URL  = http://cyber-api.solar.shaneque.ru/cs2/matches
+[2025-12-16 23:16:39] [INFO] matches_bot - Запуск бота...
+[2025-12-16 23:16:39] [INFO] matches_bot - Инициализация БД...
+[2025-12-16 23:16:39] [INFO] matches_bot - БД и таблицы инициализированы.
+[2025-12-16 23:16:39] [INFO] matches_bot - Старт фонового поллера матчей
+[2025-12-16 23:16:39] [INFO] matches_bot - Старт ежедневного нотификатора (10:00 МСК, один раз в день)
+[2025-12-16 23:16:39] [INFO] matches_bot - Старт таска напоминаний о матчах
+[2025-12-16 23:17:39] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/16-12-2025 day=2025-12-16
+[2025-12-16 23:17:44] [INFO] matches_bot - Дедупликация: было 4 матчей, осталось 4
+[2025-12-16 23:17:44] [INFO] matches_bot - Кэш обновлён: 4 матчей для dota/2025-12-16
+[2025-12-16 23:17:44] [INFO] matches_bot - Поллер: обновляем 4 сообщений для дня 2025-12-16 game=dota
+[2025-12-16 23:17:46] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/15-12-2025 day=2025-12-15
+[2025-12-16 23:17:49] [INFO] matches_bot - Дедупликация: было 18 матчей, осталось 18
+[2025-12-16 23:17:49] [INFO] matches_bot - Кэш обновлён: 18 матчей для dota/2025-12-15
+[2025-12-16 23:17:49] [INFO] matches_bot - День 2025-12-15 (dota) закрыт и не today — пропускаем апдейты
+[2025-12-16 23:17:49] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/16-12-2025 day=2025-12-16
+[2025-12-16 23:17:49] [INFO] matches_bot - Дедупликация: было 8 матчей, осталось 4
+[2025-12-16 23:17:49] [INFO] matches_bot - Кэш обновлён: 4 матчей для cs2/2025-12-16
+[2025-12-16 23:17:49] [INFO] matches_bot - Поллер: обновляем 3 сообщений для дня 2025-12-16 game=cs2
+[2025-12-16 23:17:49] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/15-12-2025 day=2025-12-15
+[2025-12-16 23:17:49] [INFO] matches_bot - Дедупликация: было 0 матчей, осталось 0
+[2025-12-16 23:17:49] [INFO] matches_bot - Кэш обновлён: 0 матчей для cs2/2025-12-15
+[2025-12-16 23:17:49] [INFO] matches_bot - День 2025-12-15 (cs2) закрыт и не today — пропускаем апдейты
+[2025-12-16 23:18:49] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/16-12-2025 day=2025-12-16
+[2025-12-16 23:18:59] [INFO] matches_bot - Дедупликация: было 4 матчей, осталось 4
+[2025-12-16 23:18:59] [INFO] matches_bot - Кэш обновлён: 4 матчей для dota/2025-12-16
+[2025-12-16 23:19:00] [INFO] matches_bot - Поллер: обновляем 4 сообщений для дня 2025-12-16 game=dota
+[2025-12-16 23:19:02] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/15-12-2025 day=2025-12-15
+[2025-12-16 23:19:09] [INFO] matches_bot - Дедупликация: было 18 матчей, осталось 18
+[2025-12-16 23:19:09] [INFO] matches_bot - Кэш обновлён: 18 матчей для dota/2025-12-15
+[2025-12-16 23:19:09] [INFO] matches_bot - День 2025-12-15 (dota) закрыт и не today — пропускаем апдейты
+[2025-12-16 23:19:09] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/16-12-2025 day=2025-12-16
+[2025-12-16 23:19:09] [INFO] matches_bot - Дедупликация: было 8 матчей, осталось 4
+[2025-12-16 23:19:09] [INFO] matches_bot - Кэш обновлён: 4 матчей для cs2/2025-12-16
+[2025-12-16 23:19:09] [INFO] matches_bot - Поллер: обновляем 3 сообщений для дня 2025-12-16 game=cs2
+[2025-12-16 23:19:09] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/15-12-2025 day=2025-12-15
+[2025-12-16 23:19:09] [INFO] matches_bot - Дедупликация: было 0 матчей, осталось 0
+[2025-12-16 23:19:09] [INFO] matches_bot - Кэш обновлён: 0 матчей для cs2/2025-12-15
+[2025-12-16 23:19:09] [INFO] matches_bot - День 2025-12-15 (cs2) закрыт и не today — пропускаем апдейты
+[2025-12-16 23:19:22] [INFO] matches_bot - Shutdown: cancelling background tasks...
+[2025-12-16 23:19:22] [INFO] matches_bot - Cancelling poll_task...
+[2025-12-16 23:19:22] [INFO] matches_bot - Cancelling daily_task...
+[2025-12-16 23:19:22] [INFO] matches_bot - Cancelling reminders_task...
+[2025-12-16 23:19:22] [INFO] matches_bot - Поллер матчей остановлен (CancelledError)
+[2025-12-16 23:19:22] [INFO] matches_bot - Ежедневный нотификатор остановлен (CancelledError)
+[2025-12-16 23:19:22] [INFO] matches_bot - Таск напоминаний остановлен (CancelledError)
+[2025-12-16 23:19:22] [INFO] matches_bot - Бот остановлен
+[2025-12-16 23:20:34] [INFO] matches_bot - Логирование инициализировано
+[2025-12-16 23:20:34] [INFO] matches_bot - DOTA_MATCHES_API_BASE_URL = http://cyber-api.solar.shaneque.ru/dota/matches
+[2025-12-16 23:20:34] [INFO] matches_bot - CS2_MATCHES_API_BASE_URL  = http://cyber-api.solar.shaneque.ru/cs2/matches
+[2025-12-16 23:20:34] [INFO] matches_bot - Запуск бота...
+[2025-12-16 23:20:34] [INFO] matches_bot - Инициализация БД...
+[2025-12-16 23:20:34] [INFO] matches_bot - БД и таблицы инициализированы.
+[2025-12-16 23:20:34] [INFO] matches_bot - Старт фонового поллера матчей
+[2025-12-16 23:20:34] [INFO] matches_bot - Старт ежедневного нотификатора (10:00 МСК, один раз в день)
+[2025-12-16 23:20:34] [INFO] matches_bot - Старт таска напоминаний о матчах
+[2025-12-16 23:21:34] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/16-12-2025 day=2025-12-16
+[2025-12-16 23:21:34] [INFO] matches_bot - Дедупликация: было 4 матчей, осталось 4
+[2025-12-16 23:21:34] [INFO] matches_bot - Кэш обновлён: 4 матчей для dota/2025-12-16
+[2025-12-16 23:21:35] [INFO] matches_bot - Поллер: обновляем 4 сообщений для дня 2025-12-16 game=dota
+[2025-12-16 23:21:35] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/15-12-2025 day=2025-12-15
+[2025-12-16 23:21:36] [INFO] matches_bot - Дедупликация: было 18 матчей, осталось 18
+[2025-12-16 23:21:36] [INFO] matches_bot - Кэш обновлён: 18 матчей для dota/2025-12-15
+[2025-12-16 23:21:36] [INFO] matches_bot - День 2025-12-15 (dota) закрыт и не today — пропускаем апдейты
+[2025-12-16 23:21:36] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/16-12-2025 day=2025-12-16
+[2025-12-16 23:21:36] [INFO] matches_bot - Дедупликация: было 8 матчей, осталось 4
+[2025-12-16 23:21:36] [INFO] matches_bot - Кэш обновлён: 4 матчей для cs2/2025-12-16
+[2025-12-16 23:21:36] [INFO] matches_bot - Поллер: обновляем 3 сообщений для дня 2025-12-16 game=cs2
+[2025-12-16 23:21:36] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/15-12-2025 day=2025-12-15
+[2025-12-16 23:21:36] [INFO] matches_bot - Дедупликация: было 0 матчей, осталось 0
+[2025-12-16 23:21:36] [INFO] matches_bot - Кэш обновлён: 0 матчей для cs2/2025-12-15
+[2025-12-16 23:21:36] [INFO] matches_bot - День 2025-12-15 (cs2) закрыт и не today — пропускаем апдейты
+[2025-12-16 23:22:17] [INFO] matches_bot - Shutdown: cancelling background tasks...
+[2025-12-16 23:22:17] [INFO] matches_bot - Cancelling poll_task...
+[2025-12-16 23:22:17] [INFO] matches_bot - Cancelling daily_task...
+[2025-12-16 23:22:17] [INFO] matches_bot - Cancelling reminders_task...
+[2025-12-16 23:22:17] [INFO] matches_bot - Поллер матчей остановлен (CancelledError)
+[2025-12-16 23:22:17] [INFO] matches_bot - Ежедневный нотификатор остановлен (CancelledError)
+[2025-12-16 23:22:17] [INFO] matches_bot - Таск напоминаний остановлен (CancelledError)
+[2025-12-16 23:22:17] [INFO] matches_bot - Бот остановлен
+[2025-12-16 23:22:34] [INFO] matches_bot - Логирование инициализировано
+[2025-12-16 23:22:34] [INFO] matches_bot - DOTA_MATCHES_API_BASE_URL = http://cyber-api.solar.shaneque.ru/dota/matches
+[2025-12-16 23:22:34] [INFO] matches_bot - CS2_MATCHES_API_BASE_URL  = http://cyber-api.solar.shaneque.ru/cs2/matches
+[2025-12-16 23:22:34] [INFO] matches_bot - Запуск бота...
+[2025-12-16 23:22:34] [INFO] matches_bot - Инициализация БД...
+[2025-12-16 23:22:34] [INFO] matches_bot - БД и таблицы инициализированы.
+[2025-12-16 23:22:34] [INFO] matches_bot - Старт фонового поллера матчей
+[2025-12-16 23:22:34] [INFO] matches_bot - Старт ежедневного нотификатора (10:00 МСК, один раз в день)
+[2025-12-16 23:22:34] [INFO] matches_bot - Старт таска напоминаний о матчах
+[2025-12-16 23:23:34] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/16-12-2025 day=2025-12-16
+[2025-12-16 23:23:35] [INFO] matches_bot - Дедупликация: было 4 матчей, осталось 4
+[2025-12-16 23:23:35] [INFO] matches_bot - Кэш обновлён: 4 матчей для dota/2025-12-16
+[2025-12-16 23:23:35] [INFO] matches_bot - Поллер: обновляем 4 сообщений для дня 2025-12-16 game=dota
+[2025-12-16 23:23:35] [INFO] matches_bot - Запрос матчей из API: game=dota url=http://cyber-api.solar.shaneque.ru/dota/matches/15-12-2025 day=2025-12-15
+[2025-12-16 23:23:36] [INFO] matches_bot - Дедупликация: было 18 матчей, осталось 18
+[2025-12-16 23:23:36] [INFO] matches_bot - Кэш обновлён: 18 матчей для dota/2025-12-15
+[2025-12-16 23:23:36] [INFO] matches_bot - День 2025-12-15 (dota) закрыт и не today — пропускаем апдейты
+[2025-12-16 23:23:36] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/16-12-2025 day=2025-12-16
+[2025-12-16 23:23:36] [INFO] matches_bot - Дедупликация: было 8 матчей, осталось 4
+[2025-12-16 23:23:36] [INFO] matches_bot - Кэш обновлён: 4 матчей для cs2/2025-12-16
+[2025-12-16 23:23:36] [INFO] matches_bot - Поллер: обновляем 3 сообщений для дня 2025-12-16 game=cs2
+[2025-12-16 23:23:36] [INFO] matches_bot - Запрос матчей из API: game=cs2 url=http://cyber-api.solar.shaneque.ru/cs2/matches/15-12-2025 day=2025-12-15
+[2025-12-16 23:23:36] [INFO] matches_bot - Дедупликация: было 0 матчей, осталось 0
+[2025-12-16 23:23:36] [INFO] matches_bot - Кэш обновлён: 0 матчей для cs2/2025-12-15
+[2025-12-16 23:23:36] [INFO] matches_bot - День 2025-12-15 (cs2) закрыт и не today — пропускаем апдейты
+[2025-12-16 23:24:22] [INFO] matches_bot - Shutdown: cancelling background tasks...
+[2025-12-16 23:24:22] [INFO] matches_bot - Cancelling poll_task...
+[2025-12-16 23:24:22] [INFO] matches_bot - Cancelling daily_task...
+[2025-12-16 23:24:22] [INFO] matches_bot - Cancelling reminders_task...
+[2025-12-16 23:24:22] [INFO] matches_bot - Поллер матчей остановлен (CancelledError)
+[2025-12-16 23:24:22] [INFO] matches_bot - Ежедневный нотификатор остановлен (CancelledError)
+[2025-12-16 23:24:22] [INFO] matches_bot - Таск напоминаний остановлен (CancelledError)
+[2025-12-16 23:24:22] [INFO] matches_bot - Бот остановлен

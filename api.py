@@ -197,6 +197,24 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
 
     matches_by_key: Dict[Any, Dict[str, Any]] = {}
 
+    def _is_tbd(value: Optional[str]) -> bool:
+        if not value:
+            return True
+        return value.strip().lower() in {"tbd", "tba", "to be decided", "to be determined", ""}
+
+    def _norm_team(value: Optional[str]) -> str:
+        if not value:
+            return ""
+        return re.sub(r"\s+", " ", value.strip().lower())
+
+    def _norm_tournament(value: Optional[str]) -> str:
+        if not value:
+            return ""
+        cleaned = re.sub(r"\s+", " ", value).strip()
+        if " - " in cleaned:
+            cleaned = cleaned.split(" - ", 1)[0]
+        return cleaned.lower()
+
     for row in rows:
         (
             match_time_msk,
@@ -220,6 +238,7 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
 
         match_dict: Dict[str, Any] = {
             "match_time_msk": match_time_msk.isoformat(),
+            "_match_time_dt": match_time_msk,
             "time_msk": match_time_msk.strftime("%H:%M"),
             "team1": team1,
             "team1_url": team_urls.get(team1) if team1 else None,
@@ -266,18 +285,34 @@ async def get_matches_for_date(target_date: date) -> List[Dict[str, Any]]:
 
     matches = list(matches_by_key.values())
 
-    non_tbd_slots: set[tuple[str, str]] = set()
+    non_tbd_by_team: Dict[tuple[str, str], List[datetime]] = {}
     for m in matches:
-        if m["team1"] != "TBD" and m["team2"] != "TBD":
-            non_tbd_slots.add((m["match_time_msk"], m["tournament"]))
+        if not _is_tbd(m["team1"]) and not _is_tbd(m["team2"]):
+            t_key = _norm_tournament(m["tournament"])
+            team1_key = _norm_team(m["team1"])
+            team2_key = _norm_team(m["team2"])
+            non_tbd_by_team.setdefault((t_key, team1_key), []).append(m["_match_time_dt"])
+            non_tbd_by_team.setdefault((t_key, team2_key), []).append(m["_match_time_dt"])
 
     filtered_matches: List[Dict[str, Any]] = []
     for m in matches:
-        if (m["team1"] == "TBD" or m["team2"] == "TBD") and (
-            m["match_time_msk"],
-            m["tournament"],
-        ) in non_tbd_slots:
-            continue
+        if _is_tbd(m["team1"]) or _is_tbd(m["team2"]):
+            real_team = None
+            if not _is_tbd(m["team1"]):
+                real_team = m["team1"]
+            elif not _is_tbd(m["team2"]):
+                real_team = m["team2"]
+
+            if real_team:
+                t_key = _norm_tournament(m["tournament"])
+                team_key = _norm_team(real_team)
+                key = (t_key, team_key)
+                candidates = non_tbd_by_team.get(key, [])
+                if any(abs(m["_match_time_dt"] - dt) <= timedelta(minutes=15) for dt in candidates):
+                    m.pop("_match_time_dt", None)
+                    continue
+
+        m.pop("_match_time_dt", None)
         filtered_matches.append(m)
 
     logger.info(f"Получено {len(filtered_matches)} матчей для даты {target_date}")

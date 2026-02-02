@@ -1,0 +1,10 @@
+[Unit]
+Description=Run CyberMatches Liquipedia CS2 parser every 10 minutes
+
+[Timer]
+OnCalendar=*:0/10
+Persistent=true
+Unit=cs2_parser.service
+
+[Install]
+WantedBy=timers.target

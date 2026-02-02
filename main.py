@@ -29,7 +29,7 @@ from psycopg import errors
 import requests
 from bs4 import BeautifulSoup, Tag
 from dotenv import load_dotenv
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse, parse_qs, urlencode
 
 # ---------------------------------------------------------------------------
 # ЛОГИ
@@ -92,6 +92,12 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9,ru;q=0.8",
 }
 
+HTTP_MAX_RETRIES = int(os.getenv("HTTP_MAX_RETRIES", "3"))
+HTTP_BACKOFF_BASE_SECONDS = float(os.getenv("HTTP_BACKOFF_BASE_SECONDS", "1.5"))
+HTTP_BLOCK_SECONDS = int(os.getenv("HTTP_BLOCK_SECONDS", "120"))
+
+_LIQUIPEDIA_BLOCKED_UNTIL = 0.0
+
 MONTHS: dict[str, int] = {
     "January": 1,
     "February": 2,
@@ -117,6 +123,10 @@ TZ_IANA_MAP = {
     "SGT": "Asia/Singapore",
     "HKT": "Asia/Hong_Kong",
     "CST": "Asia/Shanghai",      # China Standard Time
+    "PST": "America/Los_Angeles",
+    "PDT": "America/Los_Angeles",
+    "EST": "America/New_York",
+    "EDT": "America/New_York",
     "KST": "Asia/Seoul",
     "JST": "Asia/Tokyo",
     "IST": "Asia/Kolkata",       # India (no DST)
@@ -188,10 +198,72 @@ def extract_team_name_from_tag(tag: Tag) -> str:
     text = tag.get_text(strip=True)
     return _strip_page_does_not_exist(text)
 
+def sanitize_match_url(url: Optional[str]) -> Optional[str]:
+    """
+    Приводит match_url к каноническому виду и отбрасывает redlink/action=edit.
+    Возвращает None, если ссылка ведет на несуществующую страницу.
+    """
+    if not url:
+        return None
+
+    if "redlink=1" in url:
+        return None
+
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query)
+
+    if query.get("redlink") == ["1"]:
+        return None
+
+    title = query.get("title", [""])[0]
+    if title.startswith("Match:"):
+        clean_query = {"title": title}
+        return urljoin(BASE_URL, f"/dota2/index.php?{urlencode(clean_query)}")
+
+    m = re.search(r"Match:(ID_[^&#/?]+)", url)
+    if m:
+        liqui_id = m.group(1)
+        return urljoin(BASE_URL, f"/dota2/index.php?title=Match:{liqui_id}")
+
+    return url
+
+def _set_liquipedia_blocked() -> None:
+    global _LIQUIPEDIA_BLOCKED_UNTIL
+    _LIQUIPEDIA_BLOCKED_UNTIL = time.time() + HTTP_BLOCK_SECONDS
+
+
+def _is_liquipedia_blocked() -> bool:
+    return time.time() < _LIQUIPEDIA_BLOCKED_UNTIL
+
+
 def fetch_html(url: str) -> str:
-    resp = requests.get(url, headers=HEADERS, timeout=15)
-    resp.raise_for_status()
-    return resp.text
+    if _is_liquipedia_blocked():
+        raise RuntimeError("Liquipedia temporarily blocked, skipping request")
+
+    last_exc: Exception | None = None
+    for attempt in range(1, HTTP_MAX_RETRIES + 1):
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=15)
+            if resp.status_code in (403, 429):
+                _set_liquipedia_blocked()
+                last_exc = requests.HTTPError(
+                    f"{resp.status_code} Client Error: {resp.reason} for url: {url}"
+                )
+                if attempt < HTTP_MAX_RETRIES:
+                    time.sleep(HTTP_BACKOFF_BASE_SECONDS * attempt)
+                    continue
+                raise last_exc
+            resp.raise_for_status()
+            return resp.text
+        except Exception as e:
+            last_exc = e
+            if attempt < HTTP_MAX_RETRIES:
+                time.sleep(HTTP_BACKOFF_BASE_SECONDS * attempt)
+                continue
+            raise
+    if last_exc:
+        raise last_exc
+    raise RuntimeError("fetch_html failed with unknown error")
 
 
 def get_db_connection() -> psycopg.Connection:
@@ -377,6 +449,55 @@ def auto_repair_matches() -> None:
             )
             deleted_tbd = cur.rowcount
 
+            # 2б) Удаляем TBD-плейсхолдеры с разницей по времени (до 15 минут),
+            #     если есть матч с реальными командами и совпадающим известным соперником
+            cur.execute(
+                """
+                DELETE FROM dota_matches d
+                WHERE (d.team1 = 'TBD' OR d.team2 = 'TBD')
+                  AND EXISTS (
+                      SELECT 1
+                      FROM dota_matches d2
+                      WHERE d2.id <> d.id
+                        AND d2.match_time_msk IS NOT NULL
+                        AND d.match_time_msk IS NOT NULL
+                        AND ABS(
+                            EXTRACT(EPOCH FROM (d2.match_time_msk - d.match_time_msk))
+                        ) <= 900
+                        AND COALESCE(LOWER(d2.tournament), '') = COALESCE(LOWER(d.tournament), '')
+                        AND d2.team1 <> 'TBD'
+                        AND d2.team2 <> 'TBD'
+                        AND (
+                            (d.team1 <> 'TBD' AND (d2.team1 = d.team1 OR d2.team2 = d.team1))
+                            OR
+                            (d.team2 <> 'TBD' AND (d2.team1 = d.team2 OR d2.team2 = d.team2))
+                        )
+                  );
+                """
+            )
+            deleted_tbd_time_window = cur.rowcount
+
+            # 2в) Удаляем дубли по time_raw + команды/турнир/bo,
+            #     если есть версия с lp:ID (часто из-за кривого парсинга таймзон).
+            cur.execute(
+                """
+                DELETE FROM dota_matches d
+                WHERE d.match_uid NOT LIKE 'lp:ID_%'
+                  AND d.match_time_raw IS NOT NULL
+                  AND EXISTS (
+                      SELECT 1
+                      FROM dota_matches d2
+                      WHERE d2.id <> d.id
+                        AND d2.match_uid LIKE 'lp:ID_%'
+                        AND d2.match_time_raw = d.match_time_raw
+                        AND COALESCE(LOWER(d2.tournament), '') = COALESCE(LOWER(d.tournament), '')
+                        AND COALESCE(LOWER(d2.team1), '') = COALESCE(LOWER(d.team1), '')
+                        AND COALESCE(LOWER(d2.team2), '') = COALESCE(LOWER(d.team2), '')
+                        AND COALESCE(d2.bo, 0) = COALESCE(d.bo, 0)
+                  );
+                """
+            )
+            deleted_raw_dupes = cur.rowcount
             # 3а) Нормализуем законченные матчи без команд: считаем их ещё не валидными
             cur.execute(
                 """
@@ -432,6 +553,8 @@ def auto_repair_matches() -> None:
         f"[AUTO-REPAIR] deleted_no_uid={deleted_no_uid}, "
         f"deleted_placeholder_teams={deleted_placeholder_teams}, "
         f"deleted_tbd={deleted_tbd}, "
+        f"deleted_tbd_time_window={deleted_tbd_time_window}, "
+        f"deleted_raw_dupes={deleted_raw_dupes}, "
         f"fixed_finished_no_teams={fixed_finished_no_teams}, "
         f"fixed_finished_zero_zero={fixed_finished_zero_zero}, "
         f"liqui_from_uid={updated_from_uid}, "
@@ -554,8 +677,15 @@ def parse_liquipedia_time(raw: str) -> tuple[datetime | None, datetime | None]:
         "CST": "Asia/Shanghai",       # Liquipedia часто так помечает китайское время
         "EET": "Europe/Bucharest",
         "BRT": "America/Sao_Paulo",   # Brazil Time, UTC-3
+        "PST": "America/Los_Angeles",
+        "PDT": "America/Los_Angeles",
+        "EST": "America/New_York",
+        "EDT": "America/New_York",
         "IST": "Asia/Kolkata",        # India Standard Time, UTC+5:30
         "GST": "Asia/Dubai",          # Gulf Standard Time, UTC+4
+        "PET": "America/Lima",        # Peru Time, UTC-5
+        "UTC": "UTC",
+        "GMT": "UTC",
     }
 
     tz_name = tz_map.get(tz_abbr)
@@ -865,6 +995,7 @@ def parse_matches_from_html(html: str) -> List[Match]:
             href = match_page_link.get("href") or ""
             title_attr = match_page_link.get("title") or ""
             combined = " ".join([href, title_attr])
+        has_redlink = "redlink=1" in combined
 
         # если в кнопке нет ID — пробуем вытащить из текста всего контейнера
         m_id = re.search(r"Match:(ID_[^ \t&#/?]+)", combined)
@@ -873,11 +1004,13 @@ def parse_matches_from_html(html: str) -> List[Match]:
             m_id = re.search(r"Match:(ID_[^ \t&#/?]+)", text_block)
 
         # если нашли ID — строим канонический URL
-        if m_id:
+        if m_id and not has_redlink:
             liqui_id = m_id.group(1)
             match_url = urljoin(BASE_URL, f"/dota2/index.php?title=Match:{liqui_id}")
         else:
             match_url = None
+
+        match_url = sanitize_match_url(match_url)
 
         # --- Пропускаем матчи, где обе команды — заглушки (TBD/TBA/пусто) ---
         if is_placeholder_team(team1) and is_placeholder_team(team2):
@@ -987,10 +1120,43 @@ def deduplicate_matches(matches: List[Match]) -> List[Match]:
     2) Если ID нет — матч НЕ дедупим (лучше лишний дубль, чем потерянный матч).
     """
 
+    def _norm_team(value: Optional[str]) -> str:
+        return (value or "").strip().lower()
+
+    def _tournament_key(value: Optional[str]) -> str:
+        cleaned = clean_tournament_name(value or "") or (value or "")
+        return cleaned.strip().lower()
+
+    real_matches_by_team: dict[tuple[str, str], list[datetime]] = {}
+    for m in matches:
+        if (
+            not is_placeholder_team(m.team1)
+            and not is_placeholder_team(m.team2)
+            and m.time_msk is not None
+            and m.tournament
+        ):
+            t_key = _tournament_key(m.tournament)
+            real_matches_by_team.setdefault((t_key, _norm_team(m.team1)), []).append(m.time_msk)
+            real_matches_by_team.setdefault((t_key, _norm_team(m.team2)), []).append(m.time_msk)
+
     seen_lp_ids: Set[str] = set()
     result: List[Match] = []
 
     for m in matches:
+        if is_placeholder_team(m.team1) or is_placeholder_team(m.team2):
+            real_team = None
+            if not is_placeholder_team(m.team1):
+                real_team = m.team1
+            elif not is_placeholder_team(m.team2):
+                real_team = m.team2
+
+            if real_team and m.time_msk is not None and m.tournament:
+                t_key = _tournament_key(m.tournament)
+                times = real_matches_by_team.get((t_key, _norm_team(real_team)), [])
+                if any(abs(dt - m.time_msk) <= timedelta(minutes=15) for dt in times):
+                    # skip TBD/TBA if real opponent already exists nearby
+                    continue
+
         uid = ""
 
         try:
@@ -1197,8 +1363,8 @@ def _save_matches_to_db_impl(matches: List[Match]) -> None:
                                 SELECT id, match_uid
                                 FROM dota_matches
                                 WHERE
-                                    team1 = %(team1)s
-                                    AND team2 = %(team2)s
+                                    LOWER(team1) = LOWER(%(team1)s)
+                                    AND LOWER(team2) = LOWER(%(team2)s)
                                     AND lower(tournament) LIKE lower(%(tournament_prefix)s)
                                     AND match_time_msk IS NOT NULL
                                     AND ABS(
@@ -1232,7 +1398,7 @@ def _save_matches_to_db_impl(matches: List[Match]) -> None:
                                     SELECT id, match_uid
                                     FROM dota_matches
                                     WHERE
-                                        team1 = %(team)s
+                                        LOWER(team1) = LOWER(%(team)s)
                                         AND lower(tournament) LIKE lower(%(tournament_prefix)s)
                                         AND match_time_msk IS NOT NULL
                                         AND ABS(
@@ -1254,7 +1420,7 @@ def _save_matches_to_db_impl(matches: List[Match]) -> None:
                                     SELECT id, match_uid
                                     FROM dota_matches
                                     WHERE
-                                        team2 = %(team)s
+                                        LOWER(team2) = LOWER(%(team)s)
                                         AND lower(tournament) LIKE lower(%(tournament_prefix)s)
                                         AND match_time_msk IS NOT NULL
                                         AND ABS(
@@ -1303,8 +1469,8 @@ def _save_matches_to_db_impl(matches: List[Match]) -> None:
                             SELECT id, match_uid
                             FROM dota_matches
                             WHERE
-                                team1 = %(team1)s
-                                AND team2 = %(team2)s
+                                LOWER(team1) = LOWER(%(team1)s)
+                                AND LOWER(team2) = LOWER(%(team2)s)
                                 AND lower(tournament) LIKE lower(%(tournament_prefix)s)
                                 AND match_time_msk IS NOT NULL
                                 AND ABS(
@@ -1589,7 +1755,92 @@ def fetch_score_from_matches_by_id(liqui_id: str, url: str) -> tuple[Optional[st
     return score, bo_text
 
 
+def _parse_score_from_container(container: Tag) -> tuple[Optional[str], Optional[str]]:
+    score: Optional[str] = None
+    bo_text: Optional[str] = None
+
+    score_el = container.select_one(".match-info-header-scoreholder-scorewrapper")
+    if score_el:
+        upper = score_el.select_one(".match-info-header-scoreholder-upper")
+        lower = score_el.select_one(".match-info-header-scoreholder-lower")
+
+        if upper:
+            raw = upper.get_text(strip=True)
+            mm = re.match(r"^(\d+)\s*[:\-]\s*(\d+)$", raw)
+            if mm:
+                a, b = int(mm.group(1)), int(mm.group(2))
+                if 0 <= a <= 10 and 0 <= b <= 10:
+                    score = f"{a}:{b}"
+
+        if lower:
+            bo_text = lower.get_text(strip=True) or None
+
+    if not score or not bo_text:
+        f_score, f_bo = parse_score_and_bo_from_container(container)
+        if not score and f_score:
+            score = f_score
+        if not bo_text and f_bo:
+            bo_text = f_bo
+
+    return score, bo_text
+
+
+def _extract_ids_from_container(container: Tag) -> list[str]:
+    id_re = re.compile(r"(ID_[A-Za-z0-9]+(?:_[0-9A-Za-z\-]+)*)")
+    ids: list[str] = []
+
+    a_btn = container.select_one(".match-page-button a")
+    if a_btn:
+        combined = f"{a_btn.get('href','')} {a_btn.get('title','')}"
+        ids += id_re.findall(combined)
+
+    for a in container.find_all("a", href=True):
+        combined = f"{a.get('href','')} {a.get('title','')}"
+        ids += id_re.findall(combined)
+
+    ids += id_re.findall(str(container))
+
+    seen = set()
+    out = []
+    for x in ids:
+        if x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
+
+
+def _build_score_index(html: str) -> dict[str, tuple[Optional[str], Optional[str]]]:
+    soup = BeautifulSoup(html, "html.parser")
+    containers = soup.select(".match-info")
+    index: dict[str, tuple[Optional[str], Optional[str]]] = {}
+
+    for c in containers:
+        ids = _extract_ids_from_container(c)
+        if not ids:
+            continue
+
+        score, bo_text = _parse_score_from_container(c)
+        for cid in ids:
+            existing = index.get(cid)
+            if not existing:
+                index[cid] = (score, bo_text)
+                continue
+
+            cur_score, cur_bo = existing
+            if not cur_score and score:
+                cur_score = score
+            if not cur_bo and bo_text:
+                cur_bo = bo_text
+            index[cid] = (cur_score, cur_bo)
+
+    return index
+
+
 def fetch_score_from_match_page(match_url: str) -> Tuple[Optional[str], Optional[str]]:
+    match_url = sanitize_match_url(match_url)
+    if not match_url:
+        return None, None
+
     try:
         html = fetch_html(match_url)
     except requests .HTTPError as e:
@@ -1659,6 +1910,21 @@ def update_scores_from_match_pages() -> None:
         needed = bo_value // 2 + 1
         return max(a, b) >= needed
 
+    try:
+        live_html = fetch_html(MATCHES_URL)
+    except Exception as e:
+        log_event({"level": "error", "msg": "fetch_matches_failed", "error": str(e)})
+        return
+
+    completed_html = None
+    try:
+        completed_html = fetch_html(MATCHES_URL + "?status=completed")
+    except Exception as e:
+        log_event({"level": "error", "msg": "fetch_completed_failed", "error": str(e)})
+
+    live_index = _build_score_index(live_html)
+    completed_index = _build_score_index(completed_html) if completed_html else {}
+
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -1692,6 +1958,7 @@ def update_scores_from_match_pages() -> None:
                 if score_db and bo_db and _is_final_score(score_db, bo_db):
                     continue
 
+                match_url = sanitize_match_url(match_url)
                 liqui_id = (liqui_id_db or "").strip() or extract_liquipedia_id_from_url(match_url)
                 if not liqui_id:
                     cur.execute(
@@ -1705,20 +1972,19 @@ def update_scores_from_match_pages() -> None:
                 new_score: Optional[str] = None
                 new_bo: Optional[int] = None
 
-                # 1) matches (live/finished)
-                s, bo_text = fetch_score_from_matches_by_id(liqui_id, MATCHES_URL)
+                # 1) matches (live/finished) from prebuilt index
+                s, bo_text = live_index.get(liqui_id, (None, None))
                 if s:
                     new_score = s
                 if bo_text:
                     new_bo = parse_bo_int(bo_text)
 
-                # 2) completed
-                if not new_score:
-                    s, bo_text = fetch_score_from_matches_by_id(liqui_id, MATCHES_URL + "?status=completed")
-                    if s:
-                        new_score = s
-                    if bo_text and new_bo is None:
-                        new_bo = parse_bo_int(bo_text)
+                # 2) completed from prebuilt index
+                s2, bo_text2 = completed_index.get(liqui_id, (None, None))
+                if not new_score and s2:
+                    new_score = s2
+                if bo_text2 and new_bo is None:
+                    new_bo = parse_bo_int(bo_text2)
 
                 # 3) match page (optional)
                 if not new_score and match_url:
@@ -1770,7 +2036,9 @@ def update_scores_from_match_pages() -> None:
 def refresh_statuses_in_db() -> None:
     """
     Обновляем status матчей по времени и данным в БД.
-    finished ставим ТОЛЬКО если счёт финальный относительно bo.
+    finished ставим:
+      - если счёт финальный относительно bo;
+      - или если матч очень старый и есть счёт (даже без bo).
     """
     with get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -1789,6 +2057,12 @@ def refresh_statuses_in_db() -> None:
                              ) >= ((bo / 2)::int + 1)
                         THEN 'finished'
 
+                        -- 1б) матч старше 24 часов и есть счёт -> считаем завершённым
+                        WHEN match_time_msk <= now() - INTERVAL '24 hours'
+                             AND score IS NOT NULL AND score <> ''
+                             AND score ~ '^[0-9]+:[0-9]+$'
+                        THEN 'finished'
+
                         -- 2) ещё не начался
                         WHEN match_time_msk > now() + INTERVAL '5 minutes'
                         THEN 'upcoming'
@@ -1798,6 +2072,11 @@ def refresh_statuses_in_db() -> None:
                              AND match_time_msk >= now() - INTERVAL '4 hours'
                              AND (status IS NULL OR status IN ('unknown', 'upcoming'))
                         THEN 'live'
+
+                        -- 4) слишком старый live без финального счёта -> unknown
+                        WHEN match_time_msk <= now() - INTERVAL '12 hours'
+                             AND status = 'live'
+                        THEN 'unknown'
 
                         -- иначе не трогаем
                         ELSE status

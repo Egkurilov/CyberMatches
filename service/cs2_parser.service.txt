@@ -1,0 +1,12 @@
+[Unit]
+Description=CyberMatches Liquipedia CS2 parser
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/cybermatches
+ExecStart=/root/cybermatches/.venv/bin/python /root/cybermatches/cs2_main.py
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

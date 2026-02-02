@@ -6,3 +6,62 @@
 {"level": "error", "msg": "fetch_score_from_match_page_failed", "match_url": "https://liquipedia.net/dota2/index.php?title=Match:ID_DDNks4MTOH_0004&action=edit&redlink=1", "error": "403 Client Error: Forbidden for url: https://liquipedia.net/dota2/index.php?title=Match:ID_DDNks4MTOH_0004&action=edit&redlink=1", "time": "2025-12-10 23:26:58"}
 {"level": "error", "msg": "fetch_score_from_main_completed_failed", "error": "No module named 'improved_parser'", "time": "2025-12-10 23:26:59"}
 {"level": "info", "msg": "worker_once_finished", "metrics": {"parsed_matches": 100, "deduped_matches": 100, "elapsed_sec": 32.82}, "time": "2025-12-10 23:27:01"}
+2025-12-13 00:20:34,693 [INFO] {"level": "info", "msg": "worker_once_start", "time": "2025-12-13 00:20:34"}
+2025-12-13 00:20:35,310 [INFO] Синхронизировано турниров: 0
+2025-12-13 00:20:36,070 [INFO] Дедупликация матчей: было 100, стало 100
+2025-12-13 00:21:07,275 [INFO] {"level": "info", "msg": "worker_once_finished", "metrics": {"parsed_matches": 100, "deduped_matches": 100, "elapsed_sec": 32.58}, "time": "2025-12-13 00:21:07"}
+2025-12-13 00:25:46,147 [INFO] {"level": "info", "msg": "worker_once_start", "time": "2025-12-13 00:25:46"}
+2025-12-13 00:25:46,828 [INFO] Синхронизировано турниров: 0
+2025-12-13 00:25:47,620 [INFO] Дедупликация матчей: было 100, стало 100
+2025-12-13 00:26:14,681 [INFO] {"level": "error", "msg": "fetch_score_from_match_page_failed", "match_url": "https://liquipedia.net/dota2/index.php?title=Match:ID_HX2O7ymMWC_0012&action=edit&redlink=1", "error": "403 Client Error: Forbidden for url: https://liquipedia.net/dota2/index.php?title=Match:ID_HX2O7ymMWC_0012&action=edit&redlink=1", "time": "2025-12-13 00:26:14"}
+2025-12-13 00:26:16,135 [INFO] {"level": "error", "msg": "fetch_score_from_match_page_failed", "match_url": "https://liquipedia.net/dota2/index.php?title=Match:ID_HX2O7ymMWC_0009&action=edit&redlink=1", "error": "403 Client Error: Forbidden for url: https://liquipedia.net/dota2/index.php?title=Match:ID_HX2O7ymMWC_0009&action=edit&redlink=1", "time": "2025-12-13 00:26:16"}
+2025-12-13 00:26:18,563 [INFO] {"level": "info", "msg": "worker_once_finished", "metrics": {"parsed_matches": 100, "deduped_matches": 100, "elapsed_sec": 32.41}, "time": "2025-12-13 00:26:18"}
+2025-12-13 00:27:08,255 [INFO] {"level": "info", "msg": "worker_once_start", "time": "2025-12-13 00:27:08"}
+2025-12-13 00:27:09,079 [INFO] Синхронизировано турниров: 0
+2025-12-13 00:27:09,851 [INFO] Дедупликация матчей: было 100, стало 100
+2025-12-13 00:27:38,080 [INFO] {"level": "error", "msg": "fetch_score_from_match_page_failed", "match_url": "https://liquipedia.net/dota2/index.php?title=Match:ID_HX2O7ymMWC_0012&action=edit&redlink=1", "error": "403 Client Error: Forbidden for url: https://liquipedia.net/dota2/index.php?title=Match:ID_HX2O7ymMWC_0012&action=edit&redlink=1", "time": "2025-12-13 00:27:38"}
+2025-12-13 00:27:39,513 [INFO] {"level": "error", "msg": "fetch_score_from_match_page_failed", "match_url": "https://liquipedia.net/dota2/index.php?title=Match:ID_HX2O7ymMWC_0009&action=edit&redlink=1", "error": "403 Client Error: Forbidden for url: https://liquipedia.net/dota2/index.php?title=Match:ID_HX2O7ymMWC_0009&action=edit&redlink=1", "time": "2025-12-13 00:27:39"}
+2025-12-13 00:27:41,822 [INFO] {"level": "info", "msg": "worker_once_finished", "metrics": {"parsed_matches": 100, "deduped_matches": 100, "elapsed_sec": 33.57}, "time": "2025-12-13 00:27:41"}
+2025-12-13 00:30:02,815 [INFO] {"level": "info", "msg": "worker_once_start", "time": "2025-12-13 00:30:02"}
+2025-12-13 00:30:03,373 [INFO] Синхронизировано турниров: 0
+2025-12-13 00:30:04,021 [INFO] Дедупликация матчей: было 100, стало 100
+2025-12-13 00:30:30,663 [INFO] {"level": "error", "msg": "fetch_score_from_match_page_failed", "match_url": "https://liquipedia.net/dota2/Match:ID_HX2O7ymMWC_0012", "error": "404 Client Error: Not Found for url: https://liquipedia.net/dota2/Match:ID_HX2O7ymMWC_0012", "time": "2025-12-13 00:30:30"}
+2025-12-13 00:30:32,158 [INFO] {"level": "error", "msg": "fetch_score_from_match_page_failed", "match_url": "https://liquipedia.net/dota2/Match:ID_HX2O7ymMWC_0009", "error": "404 Client Error: Not Found for url: https://liquipedia.net/dota2/Match:ID_HX2O7ymMWC_0009", "time": "2025-12-13 00:30:32"}
+2025-12-13 00:30:34,533 [INFO] {"level": "info", "msg": "worker_once_finished", "metrics": {"parsed_matches": 100, "deduped_matches": 100, "elapsed_sec": 31.72}, "time": "2025-12-13 00:30:34"}
+2025-12-13 00:31:43,294 [INFO] {"level": "info", "msg": "worker_once_start", "time": "2025-12-13 00:31:43"}
+2025-12-13 00:31:43,918 [INFO] Синхронизировано турниров: 0
+2025-12-13 00:31:44,696 [INFO] Дедупликация матчей: было 100, стало 100
+2025-12-13 00:32:12,568 [INFO] {"level": "error", "msg": "fetch_score_from_match_page_failed", "match_url": "https://liquipedia.net/dota2/index.php?title=Match:ID_HX2O7ymMWC_0012", "error": "404 Client Error: Not Found for url: https://liquipedia.net/dota2/index.php?title=Match:ID_HX2O7ymMWC_0012", "time": "2025-12-13 00:32:12"}
+2025-12-13 00:32:14,532 [INFO] {"level": "error", "msg": "fetch_score_from_match_page_failed", "match_url": "https://liquipedia.net/dota2/index.php?title=Match:ID_HX2O7ymMWC_0009", "error": "404 Client Error: Not Found for url: https://liquipedia.net/dota2/index.php?title=Match:ID_HX2O7ymMWC_0009", "time": "2025-12-13 00:32:14"}
+2025-12-13 00:32:17,157 [INFO] {"level": "info", "msg": "worker_once_finished", "metrics": {"parsed_matches": 100, "deduped_matches": 100, "elapsed_sec": 33.86}, "time": "2025-12-13 00:32:17"}
+2025-12-13 00:35:33,761 [INFO] {"level": "info", "msg": "worker_once_start", "time": "2025-12-13 00:35:33"}
+2025-12-13 00:35:34,407 [INFO] Синхронизировано турниров: 0
+2025-12-13 00:35:35,170 [INFO] Дедупликация матчей: было 100, стало 100
+2025-12-13 00:36:02,468 [INFO] Match page not found (404), skip: https://liquipedia.net/dota2/index.php?title=Match:ID_HX2O7ymMWC_0009
+2025-12-13 00:36:04,470 [INFO] {"level": "info", "msg": "worker_once_finished", "metrics": {"parsed_matches": 100, "deduped_matches": 100, "elapsed_sec": 30.71}, "time": "2025-12-13 00:36:04"}
+2025-12-13 00:38:45,789 [INFO] {"level": "info", "msg": "worker_once_start", "time": "2025-12-13 00:38:45"}
+2025-12-13 00:38:46,415 [INFO] Синхронизировано турниров: 0
+2025-12-13 00:38:47,171 [INFO] Дедупликация матчей: было 100, стало 100
+2025-12-13 00:39:15,050 [INFO] {"level": "info", "msg": "worker_once_finished", "metrics": {"parsed_matches": 100, "deduped_matches": 100, "elapsed_sec": 29.26}, "time": "2025-12-13 00:39:15"}
+2025-12-13 00:40:03,881 [INFO] {"level": "info", "msg": "worker_once_start", "time": "2025-12-13 00:40:03"}
+2025-12-13 00:40:04,496 [INFO] Синхронизировано турниров: 0
+2025-12-13 00:40:05,213 [INFO] Дедупликация матчей: было 100, стало 100
+2025-12-13 00:40:34,604 [INFO] {"level": "info", "msg": "worker_once_finished", "metrics": {"parsed_matches": 100, "deduped_matches": 100, "elapsed_sec": 30.72}, "time": "2025-12-13 00:40:34"}
+2025-12-13 00:41:25,985 [INFO] {"level": "info", "msg": "worker_once_start", "time": "2025-12-13 00:41:25"}
+2025-12-13 00:41:26,562 [INFO] Синхронизировано турниров: 0
+2025-12-13 00:41:27,269 [INFO] Дедупликация матчей: было 100, стало 100
+2025-12-13 00:41:55,815 [INFO] [SCORE_ID] found target=ID_HX2O7ymMWC_0009 url=https://liquipedia.net/dota2/Liquipedia:Matches score=1:1 bo=(Bo3)
+2025-12-13 00:41:57,283 [INFO] {"level": "info", "msg": "worker_once_finished", "metrics": {"parsed_matches": 100, "deduped_matches": 100, "elapsed_sec": 31.3}, "time": "2025-12-13 00:41:57"}
+2025-12-13 00:42:44,041 [INFO] {"level": "info", "msg": "worker_once_start", "time": "2025-12-13 00:42:44"}
+2025-12-13 00:42:44,688 [INFO] Синхронизировано турниров: 0
+2025-12-13 00:42:45,489 [INFO] Дедупликация матчей: было 100, стало 100
+2025-12-13 00:43:11,949 [INFO] [SCORE_ID] try match_id=5501922 liqui_id=ID_HX2O7ymMWC_0009
+2025-12-13 00:43:12,653 [INFO] [SCORE_ID] found target=ID_HX2O7ymMWC_0009 url=https://liquipedia.net/dota2/Liquipedia:Matches score=1:1 bo=(Bo3)
+2025-12-13 00:43:12,760 [INFO] [SCORE_DB] updated id=5501922 rowcount=1 score=1:1 bo=3 status=live
+2025-12-13 00:43:14,062 [INFO] {"level": "info", "msg": "worker_once_finished", "metrics": {"parsed_matches": 100, "deduped_matches": 100, "elapsed_sec": 30.02}, "time": "2025-12-13 00:43:14"}
+2025-12-14 21:55:41,197 [INFO] {"level": "info", "msg": "worker_once_start", "time": "2025-12-14 21:55:41"}
+2025-12-14 21:55:41,513 [INFO] Синхронизировано турниров: 0
+2025-12-14 21:55:41,830 [INFO] [DEBUG] .match-info containers: 100
+2025-12-14 21:57:12,415 [INFO] {"level": "info", "msg": "worker_once_start", "time": "2025-12-14 21:57:12"}
+2025-12-14 21:57:12,747 [INFO] Синхронизировано турниров: 0
+2025-12-14 21:57:13,052 [INFO] [DEBUG] .match-info containers: 100

@@ -5,15 +5,22 @@
 ## Компоненты
 
 - **Парсеры**: Сбор матчей с Liquipedia (Dota2, CS2, команды).
-  - `main.py` - парсер матчей Dota 2
-  - `cs2_main.py` - парсер матчей CS2
-  - `teams_parser.py` - парсер команд Dota 2 и CS2
+  - `main.py` - парсер матчей Dota 2 (обёртка над `cybermatches.parsers.dota`)
+  - `cs2_main.py` - парсер матчей CS2 (обёртка над `cybermatches.parsers.cs2`)
+  - `teams_parser.py` - парсер команд Dota 2 (обёртка над `cybermatches.teams.dota`)
 
 - **API**: REST API на FastAPI для получения матчей.
-  - `api.py` - сервер API с эндпоинтами для Dota2/CS2
+  - `api.py` - сервер API с эндпоинтами для Dota2/CS2 (обёртка над `cybermatches.api.app`)
 
 - **Telegram бот**: Уведомляет о матчах, подписки, фильтры.
-  - `cyber_telegram_bot.py` - бот для Telegram
+  - `cyber_telegram_bot.py` - бот для Telegram (обёртка над `cybermatches.bot.app`)
+
+- **Пакет**: общая логика и модули.
+  - `cybermatches/common` - общие утилиты (time/text)
+  - `cybermatches/parsers` - парсеры Dota/CS2
+  - `cybermatches/api` - API-приложение
+  - `cybermatches/bot` - Telegram-бот
+  - `cybermatches/teams` - парсер команд
 
 ## База данных
 
@@ -38,3 +45,16 @@ PostgreSQL с таблицами:
 
 - Логи: `logs/`
 - Службы: systemd (service/*.txt)
+- Метрики Prometheus: `http://<host>:9108/metrics` (настройки: `METRICS_ADDR`, `METRICS_PORT`)
+
+## Scheduler (постоянный процесс)
+
+Для постоянного экспорта метрик и периодического запуска парсеров:
+
+```
+./.venv/bin/python scheduler.py
+```
+
+Переменные:
+- `DOTA_INTERVAL_SECONDS` (по умолчанию 600)
+- `CS2_INTERVAL_SECONDS` (по умолчанию 600)

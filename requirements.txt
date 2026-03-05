@@ -7,5 +7,6 @@ aiogram
 aiohttp
 fastapi
 uvicorn[standard]
-psycopg
 psycopg-pool
+pytest
+prometheus-client
